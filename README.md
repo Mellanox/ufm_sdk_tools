@@ -1,9 +1,9 @@
-# UFM_infra
-**A central repository for shared code and resources used across UFM projects.**
+# ufm_sdk_tools
+**A central repository for shared code and resources used across UFM plugin projects.**
 
 ## Introduction
 
-This repository is designed to house all the shared code and utilities that can be utilized by various UFM projects. It aims to streamline development processes by providing a centralized location for common tools and scripts, promoting code reuse, and ensuring consistency across projects.
+This repository is designed to house all the shared code and utilities that can be utilized by various UFM plugin projects. It aims to streamline development processes by providing a centralized location for common tools and scripts, promoting code reuse, and ensuring consistency across projects.
 
 ## Table of Contents
 
