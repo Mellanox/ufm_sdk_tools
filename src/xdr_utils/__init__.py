@@ -48,12 +48,23 @@ def prepare_port_type_http_telemetry_filter(port_types: List[str]) -> str:
            str: A filter string for HTTP telemetry requests that includes the integer values of
                 supported port types.
     """
-    filter_val = 'port_type__in'
+    numeric_port_types = []
     for ptype in port_types:
         ptype_val = PORT_TYPE_NAME_MAP.get(ptype)
         if not ptype_val:
             warn_msg = f'Skipping Port type {ptype}, it should be one of {SUPPORTED_PORT_TYPES_NAMES}'
             logging.warning(warn_msg)
             continue
-        filter_val = f'{filter_val}__{ptype_val.value}'
+        numeric_port_types.append(ptype_val.value)
+    if not numeric_port_types:
+        warn_msg = f'No valid port found in {port_types}'
+        logging.warning(warn_msg)
+        return ''
+    numeric_port_types.sort()
+    filter_val = f'port_type__in__{"__".join(numeric_port_types)}'
     return filter_val
+
+if __name__ == '__main__':
+    port_type = ['legacy', 'aggregated', 'plane']
+    result = prepare_port_type_http_telemetry_filter(port_type)
+    print(result)
