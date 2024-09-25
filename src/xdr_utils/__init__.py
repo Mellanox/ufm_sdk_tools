@@ -57,7 +57,7 @@ def prepare_port_type_http_telemetry_filter(port_types: List[str]) -> str:
             continue
         numeric_port_types.append(ptype_val.value)
     if not numeric_port_types:
-        warn_msg = f'No valid port found in {port_types}'
+        warn_msg = f'No valid port types found in {port_types}'
         logging.warning(warn_msg)
         return ''
     numeric_port_types.sort()
