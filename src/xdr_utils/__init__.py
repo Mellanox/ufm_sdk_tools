@@ -20,14 +20,16 @@ class PortType(Enum):
     PLANE = '2'
     AGGREGATED = '4'
 
+    @classmethod
+    def from_string(cls, name: str):
+        try:
+            return cls[name.upper()]
+        except KeyError:
+            return None
 
-PORT_TYPE_NAME_MAP = {
-    'legacy': PortType.LEGACY,
-    'plane': PortType.PLANE,
-    'aggregated': PortType.AGGREGATED
-}
-
-SUPPORTED_PORT_TYPES_NAMES = list(PORT_TYPE_NAME_MAP.keys())
+    @classmethod
+    def supported_types_names(cls):
+        return [e.name.lower() for e in cls]
 
 
 def prepare_port_type_http_telemetry_filter(port_types: List[str]) -> str:
@@ -46,22 +48,21 @@ def prepare_port_type_http_telemetry_filter(port_types: List[str]) -> str:
 
        Returns:
            str: A filter string for HTTP telemetry requests that includes the integer values of
-                supported port types.
+                supported port types. Example port_type__in__1__2__4
     """
-    numeric_port_types = []
+    numeric_port_types = set()
     for ptype in port_types:
-        ptype_val = PORT_TYPE_NAME_MAP.get(ptype)
+        ptype_val = PortType.from_string(ptype)
         if not ptype_val:
-            warn_msg = f'Skipping Port type {ptype}, it should be one of {SUPPORTED_PORT_TYPES_NAMES}'
+            warn_msg = f'Skipping Port type {ptype}, it should be one of {PortType.supported_types_names()}'
             logging.warning(warn_msg)
             continue
-        numeric_port_types.append(ptype_val.value)
+        numeric_port_types.add(ptype_val.value)
     if not numeric_port_types:
         warn_msg = f'No valid port types found in {port_types}'
         logging.warning(warn_msg)
         return ''
-    numeric_port_types.sort()
-    filter_val = f'port_type__in__{"__".join(numeric_port_types)}'
+    filter_val = f'port_type__in__{"__".join(sorted(list(numeric_port_types)))}'
     return filter_val
 
 if __name__ == '__main__':
