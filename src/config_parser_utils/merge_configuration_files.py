@@ -10,7 +10,7 @@
     This software product is governed by the End User License Agreement
     provided with the software product.
 
-@author: Anan Al-Aghbar
+@author: Miryam Schwartz
 @date:   Nov 14, 2024
 """
 import configparser
@@ -21,14 +21,13 @@ import os
 def merge_ini_files(old_file_path, new_file_path):
     # Check if files exist
     if not os.path.isfile(old_file_path):
-        logging.error("File %s does not exist.", old_file_path)
+        logging.error("file %s does not exist.", old_file_path)
         sys.exit(1)
-
     if not os.path.isfile(new_file_path):
-        logging.error("File %s does not exist.", new_file_path)
+        logging.error("file %s does not exist.", new_file_path)
         sys.exit(1)
 
-    # Create configparser objects
+    # Create a configparser object
     config_old = configparser.ConfigParser()
     config_new = configparser.ConfigParser()
     config_merged = configparser.ConfigParser()
@@ -37,8 +36,9 @@ def merge_ini_files(old_file_path, new_file_path):
     try:
         config_old.read(old_file_path)
         config_new.read(new_file_path)
+
     except configparser.Error as e:
-        logging.error("Failed to parse configuration files: %s", e)
+        logging.error("Failed to parse configurations files: %s", e)
         sys.exit(1)
 
     # Start with the new configuration as the base for the merged configuration
@@ -52,16 +52,14 @@ def merge_ini_files(old_file_path, new_file_path):
         if config_old.has_section(section):
             for option in config_merged.options(section):
                 if config_old.has_option(section, option):
-                    # Compare values in old and merged, and only update if they differ
-                    old_value = config_old.get(section, option)
-                    merged_value = config_merged.get(section, option)
-                    if old_value != merged_value:
-                        # Override the value in the merged configuration
-                        config_merged.set(section, option, old_value)
+                    # Override the value in the merged configuration
+                    config_merged.set(section, option, config_old.get(section, option))
 
-    # Write the merged configuration to the output file
+    # Write the merged configuration to the old file path
     with open(old_file_path, 'w', encoding="utf-8") as configfile:
         config_merged.write(configfile)
+
+    logging.info("Configuration has been merged and saved to %s", old_file_path)
 
 if __name__ == "__main__":
     # Get file paths from command line arguments
