@@ -70,13 +70,25 @@ def plot_histograms(results, output_file, enable_show=False):
         percentiles = list(latencies.keys())
         values = list(latencies.values())
 
-        axes[0].bar(
+        bars = axes[0].bar(
             [f"{percentile} (Run {idx+1})" for percentile in percentiles],
             values,
             color=colors[idx % len(colors)],
             alpha=0.7,
             label=f"{result['url']} (Threads: {result['threads']}, Conns: {result['connections']})",
         )
+
+        # add text labels on the bars
+        for bar in bars:
+            height = bar.get_height()
+            axes[0].text(
+                bar.get_x() + bar.get_width() / 2,
+                height,
+                f'{height:.2f}',
+                ha='center',
+                va='bottom',
+                fontsize=10
+            )
 
     axes[0].set_title("Latency Percentiles Across Runs", fontsize=16)
     axes[0].set_ylabel("Latency (ms)", fontsize=12)
@@ -88,13 +100,25 @@ def plot_histograms(results, output_file, enable_show=False):
     for idx, result in enumerate(results):
         rps = result["requests_per_sec"]
 
-        axes[1].bar(
+        bars = axes[1].bar(
             [f"Run {idx+1}"],
             [rps],
             color=colors[idx % len(colors)],
             alpha=0.7,
             label=f"{result['url']} (Threads: {result['threads']}, Conns: {result['connections']})",
         )
+
+        # Add text labels on the bars
+        for bar in bars:
+            height = bar.get_height()
+            axes[1].text(
+                bar.get_x() + bar.get_width() / 2,
+                height,
+                f'{height:.2f}',
+                ha='center',
+                va='bottom',
+                fontsize=10
+            )
 
     axes[1].set_title("Requests Per Second (RPS) Across Runs", fontsize=16)
     axes[1].set_ylabel("Requests/sec", fontsize=12)

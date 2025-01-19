@@ -97,7 +97,8 @@ def run_wrk(wrk_conf, wrk_v, api, threads, connections, wrk_path):
 
     rate = 0
     if wrk_v == "wrk2":
-        rate = int(wrk_conf.get("rate", "10"))  # Default rate 10 (wrk2)
+        default_rate = wrk_conf.get("rate", "10")  # read default test rate
+        rate = int(api.get("rate", default_rate))  # read rate set in api url
 
     # Add headers from the configuration
     if "headers" in api:
