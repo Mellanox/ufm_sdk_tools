@@ -1,0 +1,6 @@
+
+.vscode
+
+cpp_infra/build
+cpp_infra/3rdparty
+cpp_infra/rest_client
