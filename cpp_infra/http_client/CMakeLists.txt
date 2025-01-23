@@ -11,7 +11,7 @@ file(GLOB_RECURSE SOURCES "src/*.cpp")
 
 
 add_library(http_client ${SOURCES})
-target_link_libraries(http_client PRIVATE cpprest OpenSSL::SSL OpenSSL::Crypto pthread)
+target_link_libraries(http_client PRIVATE nvd_logger cpprest OpenSSL::SSL OpenSSL::Crypto pthread)
 target_include_directories(http_client PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # Include OpenSSL directories

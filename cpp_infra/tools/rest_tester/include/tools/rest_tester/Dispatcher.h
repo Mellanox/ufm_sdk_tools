@@ -7,9 +7,10 @@
 #include <memory>
 #include <thread>
 
-#include "http_client/ClientSession.h"
+#include <http_client/ClientSession.h>
+#include <http_client/SSLContext.h>
 
-#include "utils/metrics/Metrics.h"
+#include <utils/metrics/Metrics.h>
 
 namespace nvd
 {
@@ -34,7 +35,7 @@ private:
 private:
 
     net::io_context _ioc;
-    ssl::context _ctx;
+    SSLContext _sslContext;
     std::optional<net::executor_work_guard<net::io_context::executor_type>> _work_guard;
 
     std::string _host;

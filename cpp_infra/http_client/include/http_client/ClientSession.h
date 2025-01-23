@@ -17,22 +17,24 @@
 #include "http_client/Types.h"
 
 namespace beast = boost::beast;         // from <boost/beast.hpp>
-namespace http = beast::http;           // from <boost/beast/http.hpp>
+namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
 namespace net = boost::asio;            // from <boost/asio.hpp>
-namespace ssl = net::ssl;               // From <boost/asio/ssl.hpp>
+namespace ssl = boost::asio::ssl;       // From <boost/asio/ssl.hpp>
 
 using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
 namespace nvd {
 
-/// @brief  Handles the connection, handshake, and one request/response operation at a time
+/// @brief  Manage a client session on top the boost ASIO and beast library.
 class ClientSession : public std::enable_shared_from_this<ClientSession>
 {
 public:
 
     /// @brief construct ClientSession object given the io_context and ssl context
-    explicit ClientSession(net::io_context& ioc, ssl::context& ctx,
-                           const std::string& host, const std::string& port,
+    explicit ClientSession(net::io_context& ioc, 
+                           ssl::context& sslCtx,
+                           const std::string& host, 
+                           const std::string& port,
                            AuthMethod authMethod = AuthMethod::BASIC);
 
     /// @brief establish connection sync

@@ -10,32 +10,20 @@
 namespace nvd
 {
 
+// todo - read auth method from input args 
 Dispatcher::Dispatcher(std::string host, std::string port, std::string target, int version, int num_connections) :
-    _ctx(ssl::context::tlsv12_client),
+    _sslContext(AuthMethod::SSL_CERTIFICATE),
     _work_guard(net::make_work_guard(_ioc)),
     _host(std::move(host)), _port(std::move(port)),
     _target(std::move(target)), _version(version), _numConnections(num_connections)
 {
-    // todo
-    bool enableCertificateAuth = true;
-
-    if (!enableCertificateAuth)
-    {
-        _ctx.set_verify_mode(ssl::verify_none);
-    }
-    else
-    {
-        // Load client certificate and private key
-        _ctx.use_certificate_file("/tmp/certificate.crt", ssl::context::pem);
-        _ctx.use_private_key_file("/tmp/private-key.pem", ssl::context::pem);    
-    }
 }
 
 void Dispatcher::run(size_t runtime_seconds)
 {
     for (int i = 0; i < _numConnections; ++i) 
     {
-        auto session = std::make_shared<ClientSession>(_ioc, _ctx, _host, _port, nvd::AuthMethod::SSL_CERTIFICATE);
+        auto session = std::make_shared<ClientSession>(_ioc, _sslContext.get(), _host, _port, nvd::AuthMethod::SSL_CERTIFICATE);
         
         // todo - build the request here 
 

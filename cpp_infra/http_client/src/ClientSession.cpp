@@ -13,12 +13,12 @@ std::mutex _mu;
 // Objects are constructed with a strand to
 // ensure that handlers do not execute concurrently.
 ClientSession::ClientSession(net::io_context& ioc, 
-                             ssl::context& ctx,
+                             const ssl::context& sslCtx,
                              const std::string& host, const std::string& port,
                              AuthMethod authMethod) :
     _resolver(net::make_strand(ioc)),
-    _stream(net::make_strand(ioc), ctx),
-    _sslCcontext(ctx),
+    _stream(net::make_strand(ioc), sslCtx),
+    _sslCcontext(sslCtx),
     _host(host),
     _port(port),
     _authMethod(authMethod),
