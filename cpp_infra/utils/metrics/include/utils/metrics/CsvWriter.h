@@ -15,23 +15,23 @@ namespace cmn {
 class CsvWriter
 {
 public:
-    CsvWriter(const std::string& sFilePath)
+    CsvWriter(const std::string& filePath, bool isNew = false)
     {
-        LOGINFO("CsvWriter CTor {}",  sFilePath);
-        auto op = open_file(sFilePath);
+        LOGINFO("CsvWriter CTor {}", filePath);
+        auto op = open_file(filePath, isNew);
         if (op)
             return;
 
         std::string sPath;
-        const size_t lastSlashIdx = sFilePath.rfind('/');
+        const size_t lastSlashIdx = filePath.rfind('/');
         if (std::string::npos != lastSlashIdx)
         {
-            sPath = sFilePath.substr(0, lastSlashIdx);
+            sPath = filePath.substr(0, lastSlashIdx);
         }
         LOGINFO("createDirectory {}",  sPath);
         auto res = nvd::utils::createDirectory(sPath);
         if (res != nvd::utils::Success) LOGERROR("Failed to create folder {} error code {}", sPath, res);
-        open_file(sFilePath);
+        open_file(filePath, isNew);
     }
 
     ~CsvWriter()
@@ -90,9 +90,11 @@ private:
         return true;
     }
 
-    bool open_file(const std::string& sFilePath)
+    bool open_file(const std::string& sFilePath, bool isNew)
     {
-        m_ofs.open(sFilePath, std::ios::out);
+        std::ios::openmode op = std::ios::out;
+        !isNew ? op |= std::ios::app : op;
+        m_ofs.open(sFilePath, op);
 
         if (m_ofs.is_open())
         {

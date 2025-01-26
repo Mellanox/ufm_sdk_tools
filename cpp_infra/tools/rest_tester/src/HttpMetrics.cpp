@@ -5,10 +5,13 @@
 
 namespace nvd {
 
-HttpMetrics::HttpMetrics(std::string target, size_t tmInSec) :
+HttpMetrics::HttpMetrics(std::string target, size_t tmInSec, const std::string& filePath) :
     _target(std::move(target)),
-    _tmInSec(tmInSec)
+    _tmInSec(tmInSec),
+    _filePath(filePath)
 {
+    // open new file (wo append mode)
+    cmn::CsvWriter writer(_filePath, true);
 }
 
 void HttpMetrics::to_stream(std::ostream& ostr) const
@@ -43,18 +46,19 @@ HttpMetrics::statLatency() const
 {
     auto total_latency = std::accumulate(_metrics.latencies.begin(), _metrics.latencies.end(), std::chrono::milliseconds(0));
     auto avg_latency = total_latency / _metrics.latencies.size();
-
     double seconds = static_cast<double>(avg_latency.count()) / 1000.0;
+    LOGINFO("Avg Latency in milli {}, in sec {}", avg_latency.count(), seconds);
 
     double ReqPS = static_cast<double>(_metrics._totalRequests.load()) / static_cast<double>(_tmInSec);
+    LOGINFO("ReqPS  {} :  {} / {} ", ReqPS, _metrics._totalRequests.load(), _tmInSec);
     return {seconds, ReqPS};
 }
 
-void HttpMetrics::to_csv(const std::string& filePath)
+void HttpMetrics::to_csv(bool isNew)
 {
     std::lock_guard<std::mutex> lock(_mutex);
 
-    cmn::CsvWriter writer(filePath);
+    cmn::CsvWriter writer(_filePath, isNew);
 
     std::vector<std::string> metricsCollection;
     
@@ -62,8 +66,8 @@ void HttpMetrics::to_csv(const std::string& filePath)
     std::tie(avgLatency, ReqPS) = statLatency();
 
     metricsCollection.push_back(_target);
-    metricsCollection.push_back(fmt::format("{:.2f}", avgLatency));
-    metricsCollection.push_back(fmt::format("{:.2f}", ReqPS));
+    metricsCollection.push_back(fmt::format("{:.3g}", avgLatency));
+    metricsCollection.push_back(fmt::format("{:.2g}", ReqPS));
 
     writer << metricsCollection;
 }

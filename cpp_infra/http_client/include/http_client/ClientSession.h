@@ -44,6 +44,8 @@ public:
                            const std::string& port,
                            AuthMethod authMethod = AuthMethod::BASIC);
 
+    ~ClientSession();
+    
     /// @brief establish connection sync
     void connect();
 

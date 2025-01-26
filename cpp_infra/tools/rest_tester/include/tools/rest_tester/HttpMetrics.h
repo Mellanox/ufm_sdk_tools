@@ -15,15 +15,17 @@ class HttpMetrics : public http::MetricsCollector
 {
 public:
     /// construct HttpMetrics given the target url
-    HttpMetrics(std::string target, size_t tmInSec);
+    HttpMetrics(std::string target, size_t tmInSec, const std::string& filePath);
 
     /// @brief export metrics to input csv file
-    void to_csv(const std::string& filePath);
+    /// @param isNew flag to determine if to open new file
+    void to_csv(bool isNew = false);
 
     // @brief  todo export to csv
     void to_stream(std::ostream& ostr) const;
 
     size_t runtimeInSec() const;
+
 protected: 
 
     std::tuple<double,double> statLatency() const;
@@ -32,7 +34,9 @@ private:
 
     mutable std::mutex _mutex;
     std::string _target;
-    size_t _tmInSec;
+    size_t _tmInSec; 
+
+    std::string _filePath;
 };
 
 } // namespace

@@ -26,21 +26,14 @@ Dispatcher::Dispatcher(std::string host, std::string port, std::string target, s
     _target(std::move(target)),
     _version(version),
     _numConnections(num_connections),
-    _metrics(_target, runtimeSeconds)
+    _metrics(_target, runtimeSeconds, "/tmp/benchmark/auth/nvd/basic_auth_bm.csv")
 {
+    _testConfig.push_back({"basic_auth"});
+    _testConfig.push_back({"token_auth"});
 }
 
 void Dispatcher::start()
 {
-    for (int i = 0; i < _numConnections; ++i) 
-    {
-        auto session = std::make_shared<ClientSession>(_ioc, _sslContext.get(), _host, _port, _authMethod);
-        
-        // todo - build the request here 
-
-        _sessions.push_back(session);        
-    }
-
     // Run the IO context in a thread pool
     std::vector<std::thread> threads;
 
@@ -49,21 +42,11 @@ void Dispatcher::start()
         threads.emplace_back([&] { _ioc.run(); });
     }
 
-    for (auto& session : _sessions) 
+    for (auto& test : _testConfig)
     {
-        session->connect();
+        runTest(test.name);
+        _metrics.clear();
     }
-
-    // run blocking for 'runtime_seconds'
-    sendRequests();
-
-    _metrics.to_stream(std::cout);
-
-    // add metrics to csv - todo format file from args/config
-    _metrics.to_csv("/tmp/benchmark/auth/nvd/basic_auth_bm.csv");
-
-    // destroy the dummy work guard
-    _work_guard.reset();
 
     // Stop the IO context
     _ioc.stop();
@@ -75,7 +58,35 @@ void Dispatcher::start()
     }
 }
 
-void Dispatcher::sendRequests()
+void Dispatcher::runTest(std::string testName)
+{
+    LOGINFO("start running : {}", testName);
+
+    std::vector<std::shared_ptr<ClientSession>> sessions;
+
+    for (int i = 0; i < _numConnections; ++i) 
+    {
+        auto session = std::make_shared<ClientSession>(_ioc, _sslContext.get(), _host, _port, _authMethod);
+        sessions.push_back(session);        
+    }
+
+    for (auto& session : sessions) 
+    {
+        session->connect();
+        sendRequests(*session);
+    }
+
+    // run blocking for 'runtime_seconds'
+    _metrics.to_stream(std::cout);
+
+    // add metrics to csv - todo format file from args/config
+    _metrics.to_csv();
+
+    // destroy the dummy work guard
+    _work_guard.reset();
+}
+
+void Dispatcher::sendRequests(ClientSession& session)
 {
     auto endTime = std::chrono::steady_clock::now() + std::chrono::seconds(_metrics.runtimeInSec());
 
@@ -85,44 +96,40 @@ void Dispatcher::sendRequests()
     // Loop to send requests while runtime has not expired
     while (std::chrono::steady_clock::now() < endTime)
     {
-        for (auto& session : _sessions) 
+        if (!session.isConnected())
         {
-            if (!session->isConnected())
+            LOGINFO("Session Connection is close. Reconnecting..");
+            session.reconnect();
+        }
+
+        try
+        {
+            // Serialize the headers and log them
+            // std::ostringstream header_stream;
+            // header_stream << req.get().base(); 
+            // LOGINFO("--- sendRequest {}", header_stream.str());
+
+            _metrics.record_request();
+            auto resp = session.sendRequest(req);
+
+            if (resp)
             {
-                LOGINFO("Session Connection is close. Reconnecting..");
-                session->reconnect();
-            }
-
-            try
-            {
-                // Serialize the headers and log them
-                // std::ostringstream header_stream;
-                // header_stream << req.get().base(); 
-                // LOGINFO("--- sendRequest {}", header_stream.str());
-
-                _metrics.record_request();
-                auto resp = session->sendRequest(req);
-
-                if (resp)
+                //LOGINFO("--- sendRequest resp {}", resp.payload);
+                if (resp->latency > 500ms)
                 {
-                    //LOGINFO("--- sendRequest resp {}", resp.payload);
-                    if (resp->latency > 500ms)
-                    {
-                        LOGINFO("Request {} Latency {} ms", _target, std::chrono::duration_cast<std::chrono::milliseconds>(resp->latency).count());
-                    }
-                    _metrics.record_response(std::chrono::duration_cast<std::chrono::milliseconds>(resp->latency), resp->statusCode);
+                    LOGINFO("Request {} Latency {} ms", _target, std::chrono::duration_cast<std::chrono::milliseconds>(resp->latency).count());
                 }
-                else
-                {
-                    _metrics.record_fail();
-                    LOGINFO("sendRequest Failed");
-                }
-            } 
-            catch (const std::exception& e)
-            {
-                std::cerr << "Request error: " << e.what() << "\n";
+                _metrics.record_response(std::chrono::duration_cast<std::chrono::milliseconds>(resp->latency), resp->statusCode);
             }
-
+            else
+            {
+                _metrics.record_fail();
+                LOGINFO("sendRequest Failed");
+            }
+        } 
+        catch (const std::exception& e)
+        {
+            std::cerr << "Request error: " << e.what() << "\n";
         }
     }
 }

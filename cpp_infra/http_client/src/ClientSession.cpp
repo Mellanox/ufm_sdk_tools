@@ -31,6 +31,14 @@ ClientSession::ClientSession(net::io_context& ioc,
 {
 }
 
+ClientSession::~ClientSession()
+{
+    if (_streamState == StreamState::Connected)
+    {
+        disconnect();
+    }
+}
+
 void ClientSession::connect()
 {
     // Resolve the host and port
@@ -251,6 +259,8 @@ void ClientSession::disconnect()
     
     // Gracefully close the socket
     beast::get_lowest_layer(_stream).socket().shutdown(tcp::socket::shutdown_both, ec);
+
+    _streamState = StreamState::Closed;
 
     // not_connected happens sometimes so don't bother reporting it.
     if(ec && ec != beast::errc::not_connected)

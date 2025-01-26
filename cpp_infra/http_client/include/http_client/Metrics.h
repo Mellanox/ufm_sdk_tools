@@ -20,6 +20,15 @@ struct Metrics
     std::atomic<uint64_t> _totalSuccessOK = 0U;
     std::atomic<uint64_t> _totalSuccessOther = 0U;
     std::atomic<uint64_t> _totalFailed = 0U;
+
+    void clear()
+    {
+        _totalRequests.store(0U);
+        _totalResponses.store(0U);
+        _totalSuccessOK.store(0U);
+        _totalSuccessOther.store(0U);
+        _totalFailed.store(0U);
+    }
 };
 
 class MetricsCollector
@@ -51,7 +60,8 @@ public:
             ++_metrics._totalSuccessOther;
         }
     }
-
+    
+    void clear() {_metrics.clear();}
     const Metrics& metrics() const {return _metrics;}
 
 protected:

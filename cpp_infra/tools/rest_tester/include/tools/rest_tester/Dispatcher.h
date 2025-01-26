@@ -23,14 +23,23 @@ class Dispatcher
 {
 public:
 
-    Dispatcher(std::string host, std::string port, std::string target, size_t runtimeSeconds, int version, int num_connections, AuthMethod authMethod = AuthMethod::BASIC);
+    Dispatcher(std::string host, 
+               std::string port, 
+               std::string target, 
+               size_t runtimeSeconds, 
+               int version,
+               int num_connections,
+               AuthMethod authMethod = AuthMethod::BASIC);
     
-    // start run
+    /// start runnning test
     void start();
 
 private:
 
-    void sendRequests();
+    /// @brief run a test case
+    void runTest(std::string testName);
+
+    void sendRequests(ClientSession& session);
 
 private:
 
@@ -47,8 +56,14 @@ private:
     int _numConnections;
     int _duration;
 
-    std::vector<std::shared_ptr<ClientSession>> _sessions;
     HttpMetrics _metrics;
+
+    struct TestConfig
+    {
+        std::string name;
+    };
+
+    std::vector<TestConfig> _testConfig;
 };
 
 } // namespace
