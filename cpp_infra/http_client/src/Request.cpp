@@ -3,8 +3,9 @@
 
 #include <boost/beast/version.hpp>
 
-namespace nvd {
+namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
 
+namespace nvd {
 
 void Request::create(http::verb method,
                      const std::string& target,

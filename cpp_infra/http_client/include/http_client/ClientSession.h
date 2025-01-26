@@ -19,7 +19,6 @@
 #include <http_client/Request.h>
 
 namespace beast = boost::beast;         // from <boost/beast.hpp>
-namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
 namespace net = boost::asio;            // from <boost/asio.hpp>
 namespace ssl = boost::asio::ssl;       // From <boost/asio/ssl.hpp>
 
@@ -32,11 +31,11 @@ class ClientSession : public std::enable_shared_from_this<ClientSession>
 {
 public:
 
-    using StringBody = http::string_body;
-    using EmptyBody = http::empty_body;
+    using StringBody = beast::http::string_body;
+    using EmptyBody = beast::http::empty_body;
 
-    using StringBodyResponseType = http::response<StringBody>;
-    using StringBodyRequestParserType = http::response_parser<StringBody>;
+    using StringBodyResponseType = beast::http::response<StringBody>;
+    using StringBodyRequestParserType = beast::http::response_parser<StringBody>;
 
     /// @brief construct ClientSession object given the io_context and ssl context
     explicit ClientSession(net::io_context& ioc, 

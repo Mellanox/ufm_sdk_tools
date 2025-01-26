@@ -10,6 +10,8 @@ namespace nvd {
 
 std::atomic<uint64_t> ClientSession::_nextId{0};
 
+namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
+
 //------------------------------------------------------------------------------
 
 // Objects are constructed with a strand to

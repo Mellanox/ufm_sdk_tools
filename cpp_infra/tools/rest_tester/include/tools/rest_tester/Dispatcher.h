@@ -10,7 +10,7 @@
 #include <http_client/ClientSession.h>
 #include <http_client/SSLContext.h>
 
-#include <utils/metrics/Metrics.h>
+#include "HttpMetrics.h"
 
 namespace nvd
 {
@@ -23,14 +23,14 @@ class Dispatcher
 {
 public:
 
-    Dispatcher(std::string host, std::string port, std::string target, int version, int num_connections, AuthMethod authMethod = AuthMethod::BASIC);
+    Dispatcher(std::string host, std::string port, std::string target, size_t runtimeSeconds, int version, int num_connections, AuthMethod authMethod = AuthMethod::BASIC);
     
-    // todo use std::chrono::duration
-    void run(size_t runtime_seconds);
+    // start run
+    void start();
 
 private:
 
-    void sendRequests(size_t runtime_seconds);
+    void sendRequests();
 
 private:
 
@@ -48,7 +48,7 @@ private:
     int _duration;
 
     std::vector<std::shared_ptr<ClientSession>> _sessions;
-    MetricsCollector _metrics;
+    HttpMetrics _metrics;
 };
 
 } // namespace

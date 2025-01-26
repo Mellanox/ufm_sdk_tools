@@ -58,7 +58,7 @@ int __main(int argc, char** argv)
     // Launch the asynchronous operation
     nvd::Request req;
     // nvd::AuthMethod::BASIC
-    req.create(http::verb::get, target, host);
+    req.create(nvd::Request::HttpVerb::get, target, host);
     
     auto f = client->sendRequestAsync(req);
     auto tm = f.get();

@@ -28,9 +28,8 @@ int main(int argc, char** argv)
 
     // todo - read from args/config
     nvd::AuthMethod authMethod = nvd::AuthMethod::BASIC;
-    nvd::Dispatcher dispatcher(host, port, target, version, num_connections, authMethod);
-
-    dispatcher.run(runtime_seconds);
+    nvd::Dispatcher dispatcher(host, port, target, runtime_seconds, version, num_connections, authMethod);
+    dispatcher.start();
     return 0;
 }
 

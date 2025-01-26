@@ -10,7 +10,6 @@ enum class AuthMethod
 
 
 using rep_t = std::chrono::system_clock::rep;
-
 using period_t = std::nano;
         
 using duration_t = std::chrono::duration<rep_t, period_t>;

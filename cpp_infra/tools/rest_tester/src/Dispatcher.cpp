@@ -8,6 +8,7 @@
 #include <tools/rest_tester/Dispatcher.h>
 #include <utils/logger/Logger.h>
 
+#include <utils/metrics/CsvWriter.h>
 #include <http_client/Request.h>
 
 using namespace std::chrono_literals;
@@ -16,16 +17,20 @@ namespace nvd
 {
 
 // todo - read auth method from input args 
-Dispatcher::Dispatcher(std::string host, std::string port, std::string target, int version, int num_connections, AuthMethod authMethod) :
+Dispatcher::Dispatcher(std::string host, std::string port, std::string target, size_t runtimeSeconds, int version, int num_connections, AuthMethod authMethod) :
     _sslContext(authMethod),
     _work_guard(net::make_work_guard(_ioc)),
     _authMethod(authMethod),
-    _host(std::move(host)), _port(std::move(port)),
-    _target(std::move(target)), _version(version), _numConnections(num_connections)
+    _host(std::move(host)), 
+    _port(std::move(port)),
+    _target(std::move(target)),
+    _version(version),
+    _numConnections(num_connections),
+    _metrics(_target, runtimeSeconds)
 {
 }
 
-void Dispatcher::run(size_t runtime_seconds)
+void Dispatcher::start()
 {
     for (int i = 0; i < _numConnections; ++i) 
     {
@@ -50,9 +55,12 @@ void Dispatcher::run(size_t runtime_seconds)
     }
 
     // run blocking for 'runtime_seconds'
-    sendRequests(runtime_seconds);
+    sendRequests();
 
-    _metrics.print_metrics();
+    _metrics.to_stream(std::cout);
+
+    // add metrics to csv - todo format file from args/config
+    _metrics.to_csv("/tmp/benchmark/auth/nvd/basic_auth_bm.csv");
 
     // destroy the dummy work guard
     _work_guard.reset();
@@ -67,14 +75,12 @@ void Dispatcher::run(size_t runtime_seconds)
     }
 }
 
-
-void Dispatcher::sendRequests(size_t runtime_seconds)
+void Dispatcher::sendRequests()
 {
-    auto endTime = std::chrono::steady_clock::now() + std::chrono::seconds(runtime_seconds);
+    auto endTime = std::chrono::steady_clock::now() + std::chrono::seconds(_metrics.runtimeInSec());
 
     nvd::Request req;
-    req.create(http::verb::get, _target, _host, nvd::AuthMethod::BASIC);
-
+    req.create(Request::HttpVerb::get, _target, _host, nvd::AuthMethod::BASIC);
 
     // Loop to send requests while runtime has not expired
     while (std::chrono::steady_clock::now() < endTime)
@@ -86,14 +92,20 @@ void Dispatcher::sendRequests(size_t runtime_seconds)
                 LOGINFO("Session Connection is close. Reconnecting..");
                 session->reconnect();
             }
-            
+
             try
             {
+                // Serialize the headers and log them
+                // std::ostringstream header_stream;
+                // header_stream << req.get().base(); 
+                // LOGINFO("--- sendRequest {}", header_stream.str());
+
                 _metrics.record_request();
                 auto resp = session->sendRequest(req);
 
                 if (resp)
                 {
+                    //LOGINFO("--- sendRequest resp {}", resp.payload);
                     if (resp->latency > 500ms)
                     {
                         LOGINFO("Request {} Latency {} ms", _target, std::chrono::duration_cast<std::chrono::milliseconds>(resp->latency).count());
@@ -103,8 +115,8 @@ void Dispatcher::sendRequests(size_t runtime_seconds)
                 else
                 {
                     _metrics.record_fail();
+                    LOGINFO("sendRequest Failed");
                 }
-                
             } 
             catch (const std::exception& e)
             {

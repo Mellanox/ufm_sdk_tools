@@ -4,7 +4,6 @@ cmake_minimum_required(VERSION 3.10)
 project(HttpClientExample VERSION 1.0)
 
 # Find the required packages
-find_package(cpprestsdk REQUIRED)
 find_package(OpenSSL REQUIRED)
 
 file(GLOB_RECURSE SOURCES "src/*.cpp")

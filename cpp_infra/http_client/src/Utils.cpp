@@ -1,4 +1,3 @@
-#include <cpprest/json.h>
 #include <iostream>
 #include <sstream>
 #include <iomanip>

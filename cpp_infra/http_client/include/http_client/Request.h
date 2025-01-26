@@ -7,29 +7,30 @@
 
 namespace nvd {
 
-namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
-
+// todo - add api to set 
+// - user_agent
+// - 
 class Request
 {
 public:
+    using HttpVerb = boost::beast::http::verb;
+    using StringBody = boost::beast::http::string_body;
+    using EmptyBody = boost::beast::http::empty_body;
 
-    using StringBody = http::string_body;
-    using EmptyBody = http::empty_body;
-
-    using StringBodyRequestType = http::request<StringBody>;
-    using EmptyBodyRequestType = http::request<EmptyBody>;
+    using StringBodyRequestType = boost::beast::http::request<StringBody>;
+    using EmptyBodyRequestType = boost::beast::http::request<EmptyBody>;
 
     using RequestType = std::variant<EmptyBodyRequestType, StringBodyRequestType>;
 
     /// @brief create empty request (wo body)
-    void create(http::verb method,
+    void create(HttpVerb method,
                 const std::string& target,
                 const std::string& host,
                 AuthMethod authMethod = AuthMethod::BASIC,
                 int version = 11);
 
     /// @brief create request with body
-    void create(http::verb method,
+    void create(HttpVerb method,
                 const std::string& target,
                 const std::string& host,
                 const std::string& body,
@@ -37,8 +38,8 @@ public:
                 int version = 11);
 
 
-    const http::request<http::string_body>& get() const {return _req;}
-    const http::request<http::string_body>& operator*() const {return _req;}
+    const StringBodyRequestType& get() const {return _req;}
+    const StringBodyRequestType& operator*() const {return _req;}
 
 protected:
 
@@ -48,7 +49,7 @@ private:
 
     // todo 
     // std::optional<RequestType> _request;
-    http::request<http::string_body> _req;
+    StringBodyRequestType _req;
 };
 
 } // namespace
