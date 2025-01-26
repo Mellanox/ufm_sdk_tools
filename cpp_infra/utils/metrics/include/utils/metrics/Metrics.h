@@ -14,7 +14,8 @@ class MetricsCollector
     
     std::atomic<uint64_t> _totalRequests = 0U;
     std::atomic<uint64_t> _totalResponses = 0U;
-    std::atomic<uint64_t> _totalSuccess = 0U;
+    std::atomic<uint64_t> _totalSuccessOK = 0U;
+    std::atomic<uint64_t> _totalSuccessOther = 0U;
     std::atomic<uint64_t> _totalFailed = 0U;
 
      
@@ -26,6 +27,11 @@ public:
         ++_totalRequests;
     }
 
+    void record_fail()
+    {
+        ++_totalFailed;
+    }
+
     void record_response(std::chrono::milliseconds latency, uint32_t statusCode)
     {
         _latencies.push_back(latency);
@@ -33,12 +39,12 @@ public:
 
         if (statusCode == 200U)
         {
-            ++_totalSuccess;
+            ++_totalSuccessOK;
         }
         else
         {   
             // todo  - split to 3xx / 4xx
-            ++_totalFailed;
+            ++_totalSuccessOther;
         }
     }
 

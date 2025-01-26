@@ -26,7 +26,9 @@ int main(int argc, char** argv)
 
     int version = argc == 5 && !std::strcmp("1.0", argv[4]) ? 10 : 11;
 
-    nvd::Dispatcher dispatcher(host, port, target, version, num_connections);
+    // todo - read from args/config
+    nvd::AuthMethod authMethod = nvd::AuthMethod::BASIC;
+    nvd::Dispatcher dispatcher(host, port, target, version, num_connections, authMethod);
 
     dispatcher.run(runtime_seconds);
     return 0;

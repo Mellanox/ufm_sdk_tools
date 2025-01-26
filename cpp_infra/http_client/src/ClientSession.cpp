@@ -3,22 +3,25 @@
 
 #include <boost/asio/strand.hpp>
 
-#include "http_client/Utils.h"
+#include <http_client/Utils.h>
+#include <utils/logger/Logger.h>
 
 namespace nvd {
 
+std::atomic<uint64_t> ClientSession::_nextId{0};
+
 //------------------------------------------------------------------------------
-std::mutex _mu;
 
 // Objects are constructed with a strand to
 // ensure that handlers do not execute concurrently.
 ClientSession::ClientSession(net::io_context& ioc, 
-                             const ssl::context& sslCtx,
+                             ssl::context& sslCtx,
                              const std::string& host, const std::string& port,
                              AuthMethod authMethod) :
+    _id{++_nextId},
+    _sslCcontext(sslCtx),
     _resolver(net::make_strand(ioc)),
     _stream(net::make_strand(ioc), sslCtx),
-    _sslCcontext(sslCtx),
     _host(host),
     _port(port),
     _authMethod(authMethod),
@@ -39,7 +42,7 @@ void ClientSession::connect()
 
     _streamState = StreamState::Connected;
 
-    std::cout << "Exit connect" << std::endl;
+    LOGINFO("ClientSession connect SUccess");
 }
 
 void ClientSession::reconnect()
@@ -117,48 +120,34 @@ void ClientSession::on_handshake(beast::error_code ec)
     beast::get_lowest_layer(_stream).expires_after(std::chrono::seconds(30));
 }
 
-void ClientSession::create_request(const std::string& target, int version)
-{
-    _req.version(version);
-    _req.method(http::verb::get);
-    _req.target(target);
-    _req.set(http::field::connection, "keep-alive");
-    _req.set(http::field::host, _host);
-
-    if (_authMethod == AuthMethod::BASIC)
-    {
-        setReqBasicAuth();
-    }
-    else if (_authMethod == AuthMethod::SSL_CERTIFICATE)
-    {
-        _req.set(http::field::content_type, "application/json"); // Add Content-Type header
-    }
-
-    _req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
-        
-}
-
-Result ClientSession::sendRequest(const std::string& target, int version)
+std::optional<Result> ClientSession::sendRequest(const Request& req)
 {
     // Record the start time
     auto startTime = std::chrono::steady_clock::now();
 
     // reset the response
     auto response = http::response<http::string_body>();
+
+    // todo - check connection
     
-    create_request(target, version);
-
-    http::write(_stream, _req);
-
-    http::read(_stream, _buffer, response);
+    try
+    {
+        http::write(_stream, *req);
+        http::read(_stream, _buffer, response);
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << "Error :" << ": " << e.what() << "\n";
+        return std::nullopt;
+    }
 
     auto latency = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - startTime);
 
-    return {static_cast<uint32_t>(response.result()), response.body(), latency};
+    return Result{static_cast<uint32_t>(response.result()), response.body(), latency};
 }
 
-std::future<std::chrono::milliseconds> ClientSession::sendRequestAsync(const std::string& target, int version)
+std::future<std::chrono::milliseconds> ClientSession::sendRequestAsync(const Request& req)
 {
     _promise.emplace();
 
@@ -168,15 +157,11 @@ std::future<std::chrono::milliseconds> ClientSession::sendRequestAsync(const std
     // Record the start time
     _startTime = std::chrono::steady_clock::now();
 
-    // todo pass the request in API
-    // Set up an HTTP GET request message
-    create_request(target, version);
-
     auto future = _promise->get_future();
 
     // Send the HTTP request to the remote host
     http::async_write(
-        _stream, _req,
+        _stream, *req,
         beast::bind_front_handler(&ClientSession::on_write, shared_from_this()));
     
     return future;
@@ -270,16 +255,6 @@ void ClientSession::disconnect()
         return fail(ec, "shutdown");
 }
 
-void ClientSession::setReqBasicAuth()
-{
-    // Credentials
-    const std::string username = "admin";
-    const std::string password = "123456";
-    const std::string credentials = username + ":" + password;
-    const std::string base64Credentials = utils::base64Encode(credentials);
-
-    _req.set(http::field::authorization, "Basic " + base64Credentials);
-}
 
 // Report a failure
 void ClientSession::fail(beast::error_code ec, char const* what)
@@ -310,11 +285,12 @@ void ClientSession::on_shutdown(beast::error_code ec)
         std::cerr << "Shutdown error: " << ec.message() << "\n";
     }
 
+    // todo - check this flow if need to reconnect
     // The connection is now fully closed; reconnect
-    std::cout << "Connection closed. Reconnecting...\n";
+    LOGINFO("on_shutdown. Reconnecting..");
     
     //reestablish_connection();
-    connect();
+    //connect();
 
     // Fulfill the promise with an error
     if (_promise) 
@@ -331,7 +307,7 @@ void ClientSession::reestablish_connection()
 {
     // Start the connection process again
     _resolver.async_resolve(
-        _req[http::field::host].to_string(), "443",
+        _host, "443",
         beast::bind_front_handler(&ClientSession::onResolve, shared_from_this()));
 }
 

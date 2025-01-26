@@ -23,7 +23,7 @@ class Dispatcher
 {
 public:
 
-    Dispatcher(std::string host, std::string port, std::string target, int version, int num_connections);
+    Dispatcher(std::string host, std::string port, std::string target, int version, int num_connections, AuthMethod authMethod = AuthMethod::BASIC);
     
     // todo use std::chrono::duration
     void run(size_t runtime_seconds);
@@ -38,6 +38,7 @@ private:
     SSLContext _sslContext;
     std::optional<net::executor_work_guard<net::io_context::executor_type>> _work_guard;
 
+    AuthMethod _authMethod;
     std::string _host;
     std::string _port;
     std::string _target;

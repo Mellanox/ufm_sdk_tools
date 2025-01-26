@@ -10,11 +10,13 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <atomic>
 
 #include <future>
 #include <optional>
 
-#include "http_client/Types.h"
+#include <http_client/Types.h>
+#include <http_client/Request.h>
 
 namespace beast = boost::beast;         // from <boost/beast.hpp>
 namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
@@ -29,6 +31,12 @@ namespace nvd {
 class ClientSession : public std::enable_shared_from_this<ClientSession>
 {
 public:
+
+    using StringBody = http::string_body;
+    using EmptyBody = http::empty_body;
+
+    using StringBodyResponseType = http::response<StringBody>;
+    using StringBodyRequestParserType = http::response_parser<StringBody>;
 
     /// @brief construct ClientSession object given the io_context and ssl context
     explicit ClientSession(net::io_context& ioc, 
@@ -52,10 +60,10 @@ public:
     std::future<void> connectAsync(const std::string& host, const std::string& port);
 
     /// @brief send a sync request
-    Result sendRequest(const std::string& target, int version);
+    std::optional<Result> sendRequest(const Request& req);
 
     /// @brief send an async request
-    std::future<std::chrono::milliseconds> sendRequestAsync(const std::string& target, int version);
+    std::future<std::chrono::milliseconds> sendRequestAsync(const Request& req);
 
 private:
 
@@ -73,10 +81,6 @@ private:
     // sync
     void recreate_stream();
 
-    void create_request(const std::string& target, int version);
-
-    void setReqBasicAuth();
-
     void fail(beast::error_code ec, const char* what);
 
     enum class StreamState
@@ -88,13 +92,12 @@ private:
     };
 
 private:
+    uint64_t _id;
 
+    ssl::context& _sslCcontext;
     tcp::resolver _resolver;
     beast::ssl_stream<beast::tcp_stream> _stream; // Use SSL stream instead of basic TCP stream
-    ssl::context& _sslCcontext;
     beast::flat_buffer _buffer; // (Must persist between reads)
-    http::request<http::empty_body> _req;
-    http::response<http::string_body> _response;
 
     std::string _host;
     std::string _port;
@@ -105,8 +108,13 @@ private:
     std::optional<std::promise<std::chrono::milliseconds>> _promise; // Holds the promise for the current request
     std::optional<std::promise<void>> _connectPromise; // Holds the promise for the current request
 
+    StringBodyResponseType _response;
+
     // todo - move to profiler
     std::chrono::steady_clock::time_point _startTime;
+
+    // static data
+    static std::atomic<uint64_t> _nextId;
 };
 
 } // namespace nvd

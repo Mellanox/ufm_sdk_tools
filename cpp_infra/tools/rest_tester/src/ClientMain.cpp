@@ -1,5 +1,5 @@
 
-#include "http_client/ClientSession.h"
+#include <http_client/ClientSession.h>
 
 /// ufm.azurehpc.core.azure-test.net has dns map in /etc/hosts 
 /// ./bin/rest_tester ufm.azurehpc.core.azure-test.net 443 /ufmRest/app/ufm_version 1.1
@@ -20,11 +20,9 @@ int __main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-
     auto const host = argv[1];
     auto const port = argv[2];
     auto const target = argv[3];
-    int version = argc == 5 && !std::strcmp("1.0", argv[4]) ? 10 : 11;
 
     // The io_context is required for all I/O
     net::io_context ioc;
@@ -58,7 +56,11 @@ int __main(int argc, char** argv)
     client->connect();
 
     // Launch the asynchronous operation
-    auto f = client->sendRequestAsync(target, version);
+    nvd::Request req;
+    // nvd::AuthMethod::BASIC
+    req.create(http::verb::get, target, host);
+    
+    auto f = client->sendRequestAsync(req);
     auto tm = f.get();
     std::cout << "Req finished after "  << tm.count() << std::endl;
     
