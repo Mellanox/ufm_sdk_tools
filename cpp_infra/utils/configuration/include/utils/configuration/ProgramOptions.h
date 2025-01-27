@@ -32,10 +32,10 @@ public:
     void add_arg(const std::string& name, const std::string& short_opt, const std::string& description);
 
     /// @brief lookup argument value given its name
-    ///        If an argument has no default value, it will throw runtime error
+    /// @param required if 'required' true and not found will generate log error
     /// @return value of the given argument name, nullopt otherwise    
     template <typename T>
-    std::optional<T> get_value(const std::string& name) const;
+    std::optional<T> get_value(const std::string& name, bool required = false) const;
 
 private:
 
@@ -61,7 +61,7 @@ void ProgramOptions::add_arg(const std::string& name, const std::string& short_o
 
 // Get the value of an argument
 template <typename T>
-std::optional<T> ProgramOptions::get_value(const std::string& name) const 
+std::optional<T> ProgramOptions::get_value(const std::string& name, bool required) const 
 {
     if (_vmap.count(name)) 
     {
@@ -69,8 +69,10 @@ std::optional<T> ProgramOptions::get_value(const std::string& name) const
     } 
     else 
     {
-        //throw std::runtime_error();
-        LOGERROR("Argument '{}' not found.", name);
+        if (required)
+        {
+            LOGERROR("Argument '{}' not found.", name);
+        }
         return std::nullopt;
     }
 }

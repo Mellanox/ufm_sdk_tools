@@ -51,6 +51,12 @@ public:
         return m_isOpen;
     }
 
+    bool writeHeader(const std::string& sHeader)
+    {
+        m_ofs << sHeader << "\n";
+        return true;
+    }
+
     /// @brief write the vector values into new line
     ///        in the csv file seperated by ',' delimiter
     /// @brief sHeader first column value

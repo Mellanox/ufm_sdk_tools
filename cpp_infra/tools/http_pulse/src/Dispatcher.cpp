@@ -5,7 +5,7 @@
 #include <memory>
 #include <thread>
 
-#include <tools/rest_tester/Dispatcher.h>
+#include <tools/http_pulse/Dispatcher.h>
 #include <utils/logger/Logger.h>
 
 #include <utils/metrics/CsvWriter.h>
@@ -17,17 +17,13 @@ namespace nvd
 {
 
 // todo - read auth method from input args 
-Dispatcher::Dispatcher(std::string host, std::string port, std::string target, size_t runtimeSeconds, int version, int num_connections, std::string metrics_out_path, AuthMethod authMethod) :
-    _sslContext(authMethod),
+Dispatcher::Dispatcher(const HttpCommand& command) :
+    _sslContext(command.user, command.certPath),
     _work_guard(net::make_work_guard(_ioc)),
-    _authMethod(authMethod),
-    _host(std::move(host)), 
-    _port(std::move(port)),
-    _target(std::move(target)),
-    _version(version),
-    _numConnections(num_connections),
-    _metrics(_target, runtimeSeconds, metrics_out_path, "basic_auth_bm.csv")
+    _command(command),
+    _metrics(_command.url, command.runtime_seconds, command.metrics_out_path, command.name)
 {
+    // todo - read from config
     _testConfig.push_back({"basic_auth"});
     _testConfig.push_back({"token_auth"});
 }
@@ -37,7 +33,7 @@ void Dispatcher::start()
     // Run the IO context in a thread pool
     std::vector<std::thread> threads;
 
-    for (int i = 0; i < _numConnections; ++i)
+    for (int i = 0; i < _command.num_connections; ++i)
     {
         threads.emplace_back([&] { _ioc.run(); });
     }
@@ -64,9 +60,11 @@ void Dispatcher::runTest(std::string testName)
 
     std::vector<std::shared_ptr<ClientSession>> sessions;
 
-    for (int i = 0; i < _numConnections; ++i) 
+    auto authMethod = getAuthMethod();
+
+    for (int i = 0; i < _command.num_connections; ++i) 
     {
-        auto session = std::make_shared<ClientSession>(_ioc, _sslContext.get(), _host, _port, _authMethod);
+        auto session = std::make_shared<ClientSession>(_ioc, _sslContext.get(), _command.host, _command.port, authMethod);
         sessions.push_back(session);        
     }
 
@@ -86,12 +84,41 @@ void Dispatcher::runTest(std::string testName)
     _work_guard.reset();
 }
 
+nvd::AuthMethod Dispatcher::getAuthMethod() const
+{
+    if (_command.certPath)
+    {
+        return nvd::AuthMethod::SSL_CERTIFICATE;
+    }
+    else if (_command.user)
+    {
+        return nvd::AuthMethod::BASIC;
+    }
+
+    LOGERROR("Unknown AuthMethod");
+    return nvd::AuthMethod::UNKNOWN;
+}
+
+std::unique_ptr<nvd::Request> Dispatcher::createRequest() const
+{
+    auto req = std::make_unique<nvd::Request>();
+
+    auto auth = getAuthMethod();
+    
+    req->create(Request::HttpVerb::get, _command.url, _command.host, auth);
+
+    if (_command.user)
+    {
+        req->setAuthorization(*_command.user);
+    }
+    return req;
+}
+    
 void Dispatcher::sendRequests(ClientSession& session)
 {
-    auto endTime = std::chrono::steady_clock::now() + std::chrono::seconds(_metrics.runtimeInSec());
+    auto req = createRequest();
 
-    nvd::Request req;
-    req.create(Request::HttpVerb::get, _target, _host, nvd::AuthMethod::BASIC);
+    auto endTime = std::chrono::steady_clock::now() + std::chrono::seconds(_metrics.runtimeInSec());
 
     // Loop to send requests while runtime has not expired
     while (std::chrono::steady_clock::now() < endTime)
@@ -110,14 +137,14 @@ void Dispatcher::sendRequests(ClientSession& session)
             // LOGINFO("--- sendRequest {}", header_stream.str());
 
             _metrics.record_request();
-            auto resp = session.sendRequest(req);
+            auto resp = session.sendRequest(*req);
 
             if (resp)
             {
                 //LOGINFO("--- sendRequest resp {}", resp.payload);
                 if (resp->latency > 500ms)
                 {
-                    LOGINFO("Request {} Latency {} ms", _target, std::chrono::duration_cast<std::chrono::milliseconds>(resp->latency).count());
+                    LOGINFO("Request {} Latency {} ms", _command.url, std::chrono::duration_cast<std::chrono::milliseconds>(resp->latency).count());
                 }
                 _metrics.record_response(std::chrono::duration_cast<std::chrono::milliseconds>(resp->latency), resp->statusCode);
             }
@@ -131,6 +158,8 @@ void Dispatcher::sendRequests(ClientSession& session)
         {
             std::cerr << "Request error: " << e.what() << "\n";
         }
+
+        if (_command.dry_run) break;
     }
 }
 

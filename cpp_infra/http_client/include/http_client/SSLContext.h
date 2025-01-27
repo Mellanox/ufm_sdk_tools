@@ -1,6 +1,8 @@
 
 #pragma once 
 
+#include <optional>
+
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
 
@@ -16,7 +18,7 @@ namespace nvd {
 class SSLContext
 {
 public:
-    explicit SSLContext(AuthMethod authMethood);
+    explicit SSLContext(std::optional<std::string> user, std::optional<std::string> certPath = std::nullopt);
     
     ssl::context& get() const;
     

@@ -1,5 +1,5 @@
 
-#include <tools/rest_tester/HttpMetrics.h>
+#include <tools/http_pulse/HttpMetrics.h>
 
 #include <fmt/core.h>
 
@@ -7,12 +7,19 @@ namespace nvd {
 
 HttpMetrics::HttpMetrics(std::string target, size_t tmInSec, const std::string& filePath, const std::string& testName) :
     _target(std::move(target)),
-    _tmInSec(tmInSec)
+    _tmInSec(tmInSec),
+    _numThreads(1),
+    _numConnections(1)
 {
-    _csvPath = std::filesystem::path(filePath) / testName;
+    auto fileName = testName + ".csv";
+    _csvPath = std::filesystem::path(filePath) / fileName;
 
     // open new file (wo append mode)
     cmn::CsvWriter writer(_csvPath.string(), true);
+
+    // write the header as expected by the 'run_wrk_benchmark.py' tool (TBD)
+    std::string header = "API,Threads,Connections,Latency (ms),Requests/sec";
+    writer.writeHeader(header);
 }
 
 void HttpMetrics::to_stream(std::ostream& ostr) const
@@ -42,7 +49,7 @@ void HttpMetrics::to_stream(std::ostream& ostr) const
     ostr << "99th Percentile Latency: " << p99_latency.count() << " ms\n";
 }
 
-std::tuple<double, double> 
+std::tuple<std::chrono::milliseconds, double> 
 HttpMetrics::statLatency() const
 {
     auto total_latency = std::accumulate(_metrics.latencies.begin(), _metrics.latencies.end(), std::chrono::milliseconds(0));
@@ -52,7 +59,7 @@ HttpMetrics::statLatency() const
 
     double ReqPS = static_cast<double>(_metrics._totalRequests.load()) / static_cast<double>(_tmInSec);
     LOGINFO("ReqPS  {} :  {} / {} ", ReqPS, _metrics._totalRequests.load(), _tmInSec);
-    return {seconds, ReqPS};
+    return {avg_latency, ReqPS};
 }
 
 void HttpMetrics::to_csv(bool isNew)
@@ -63,12 +70,15 @@ void HttpMetrics::to_csv(bool isNew)
 
     std::vector<std::string> metricsCollection;
     
-    double avgLatency, ReqPS;
+    double ReqPS;
+    std::chrono::milliseconds avgLatency;
     std::tie(avgLatency, ReqPS) = statLatency();
 
     metricsCollection.push_back(_target);
-    metricsCollection.push_back(fmt::format("{:.3g}", avgLatency));
-    metricsCollection.push_back(fmt::format("{:.2g}", ReqPS));
+    metricsCollection.push_back(std::to_string(_numThreads));
+    metricsCollection.push_back(std::to_string(_numConnections));
+    metricsCollection.push_back(fmt::format("{}", avgLatency.count()));
+    metricsCollection.push_back(fmt::format("{:.2f}", ReqPS));
 
     writer << metricsCollection;
 }

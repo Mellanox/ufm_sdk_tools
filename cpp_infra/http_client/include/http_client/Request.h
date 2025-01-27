@@ -7,9 +7,8 @@
 
 namespace nvd {
 
-// todo - add api to set 
-// - user_agent
-// - 
+/// @brief encapsulate http request, 
+///        provide API to build request with required fields
 class Request
 {
 public:
@@ -29,26 +28,23 @@ public:
                 AuthMethod authMethod = AuthMethod::BASIC,
                 int version = 11);
 
-    /// @brief create request with body
-    void create(HttpVerb method,
-                const std::string& target,
-                const std::string& host,
-                const std::string& body,
-                AuthMethod authMethod = AuthMethod::BASIC,
-                int version = 11);
+    /// @brief set request body field
+    void setBody(const std::string& body);
 
+    /// @brief set request 'user_agent' field
+    void setUserAgent(const std::string& userAgent);
+
+    /// @brief set request credentials
+    /// @param credentials string formated as 'user:pass'
+    void setAuthorization(const std::string& credentials, bool base64encode = true);
 
     const StringBodyRequestType& get() const {return _req;}
     const StringBodyRequestType& operator*() const {return _req;}
 
-protected:
-
-    void setReqBasicAuth();
-
 private:
 
-    // todo 
-    // std::optional<RequestType> _request;
+    // todo  use optional or std::variant to decide on the real type on constructions (w/empty body)
+    // std::optional<RequestType> / std::variant<StringBodyRequestType, StringBodyRequestType>
     StringBodyRequestType _req;
 };
 

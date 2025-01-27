@@ -5,7 +5,8 @@ namespace nvd {
 enum class AuthMethod
 {
     BASIC,
-    SSL_CERTIFICATE
+    SSL_CERTIFICATE,
+    UNKNOWN
 };
 
 

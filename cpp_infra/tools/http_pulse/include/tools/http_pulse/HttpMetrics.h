@@ -29,7 +29,7 @@ public:
 
 protected: 
 
-    std::tuple<double,double> statLatency() const;
+    std::tuple<std::chrono::milliseconds,double> statLatency() const;
 
 private:
 
@@ -37,6 +37,8 @@ private:
     std::string _target;
     size_t _tmInSec; 
 
+    size_t _numThreads;
+    size_t _numConnections;
     std::filesystem::path _csvPath;
 };
 

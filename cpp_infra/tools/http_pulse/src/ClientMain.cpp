@@ -2,7 +2,7 @@
 #include <http_client/ClientSession.h>
 
 /// ufm.azurehpc.core.azure-test.net has dns map in /etc/hosts 
-/// ./bin/rest_tester ufm.azurehpc.core.azure-test.net 443 /ufmRest/app/ufm_version 1.1
+/// ./bin/http_pulse ufm.azurehpc.core.azure-test.net 443 /ufmRest/app/ufm_version 1.1
 int __main(int argc, char** argv)
 {
     using namespace std::chrono_literals;
