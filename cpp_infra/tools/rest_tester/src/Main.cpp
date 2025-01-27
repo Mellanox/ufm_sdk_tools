@@ -18,6 +18,8 @@ void build_po(nvd::ProgramOptions& options)
     options.add_arg<std::string>("body", "bo", "HTTP body for POST requests", "");
     options.add_arg<int>("http_version", "hv", "HTTP version (default: 11)", 11);
     options.add_arg<std::string>("port", "po", "HTTP port (default: 443)", "443");
+
+    options.add_arg<std::string>("metrics_out_path", "meto", "The metrics output path as csv file (default: '/tmp/benchmark/')", "/tmp/benchmark/");
 }
 
 struct HttpInput
@@ -29,6 +31,7 @@ struct HttpInput
     size_t runtime_seconds;
     int version;
     nvd::AuthMethod authMethod;
+    std::string metrics_out_path;
 };
 
 std::optional<HttpInput> parseHttpParams(int argc, char** argv)
@@ -49,15 +52,18 @@ std::optional<HttpInput> parseHttpParams(int argc, char** argv)
     auto runtime_seconds = options.get_value<size_t>("seconds");
     auto port = options.get_value<std::string>("port");
     auto version = options.get_value<int>("http_version");
+    auto metrics_out_path = options.get_value<std::string>("metrics_out_path");    
 
     //std::string method = options.get_value("method").empty() ? "GET" : options.get_value("method");
     //std::string body = options.get_value("body");
 
-    if (!host || !url || !num_connections || !runtime_seconds || !port || !version) return std::nullopt;
+    if (!host || !url || !num_connections || !runtime_seconds || !port || !version || !metrics_out_path) return std::nullopt;
     
-    return HttpInput{*host, *port, *url, *num_connections, *runtime_seconds, *version, nvd::AuthMethod::BASIC};
+    return HttpInput{*host, *port, *url, *num_connections, *runtime_seconds, *version, nvd::AuthMethod::BASIC, *metrics_out_path};
 }
 
+// Example 
+// rest_tester --host ufm.azurehpc.core.azure-test.net --url /ufmRest/app/ufm_version --seconds 10
 
 // ./benchmark_tool ufm.azurehpc.core.azure-test.net /ufmRest/app/ufm_version 4 60
 int main(int argc, char** argv)
@@ -73,8 +79,15 @@ int main(int argc, char** argv)
     }
 
     LOGINFO("start {} : host '{}', port '{}', url '{}', seconds '{}', connection '{}', version '{}'", argv[0], httpParams->host, httpParams->port, httpParams->url, httpParams->runtime_seconds, httpParams->version, httpParams->num_connections);
-    nvd::Dispatcher dispatcher(httpParams->host, httpParams->port, httpParams->url, httpParams->runtime_seconds, httpParams->version, httpParams->num_connections, httpParams->authMethod);
+
+    nvd::Dispatcher dispatcher(httpParams->host,
+                               httpParams->port,
+                               httpParams->url,
+                               httpParams->runtime_seconds,
+                               httpParams->version,
+                               httpParams->num_connections,
+                               httpParams->metrics_out_path,
+                               httpParams->authMethod);
     dispatcher.start();
     return 0;
 }
-

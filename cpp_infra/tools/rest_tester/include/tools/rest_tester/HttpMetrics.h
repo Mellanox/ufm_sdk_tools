@@ -7,6 +7,7 @@
 
 #include <mutex>
 #include <string>
+#include <filesystem>
 
 namespace nvd {
 
@@ -15,7 +16,7 @@ class HttpMetrics : public http::MetricsCollector
 {
 public:
     /// construct HttpMetrics given the target url
-    HttpMetrics(std::string target, size_t tmInSec, const std::string& filePath);
+    HttpMetrics(std::string target, size_t tmInSec, const std::string& filePath, const std::string& testName);
 
     /// @brief export metrics to input csv file
     /// @param isNew flag to determine if to open new file
@@ -36,7 +37,7 @@ private:
     std::string _target;
     size_t _tmInSec; 
 
-    std::string _filePath;
+    std::filesystem::path _csvPath;
 };
 
 } // namespace

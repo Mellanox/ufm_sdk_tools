@@ -5,13 +5,14 @@
 
 namespace nvd {
 
-HttpMetrics::HttpMetrics(std::string target, size_t tmInSec, const std::string& filePath) :
+HttpMetrics::HttpMetrics(std::string target, size_t tmInSec, const std::string& filePath, const std::string& testName) :
     _target(std::move(target)),
-    _tmInSec(tmInSec),
-    _filePath(filePath)
+    _tmInSec(tmInSec)
 {
+    _csvPath = std::filesystem::path(filePath) / testName;
+
     // open new file (wo append mode)
-    cmn::CsvWriter writer(_filePath, true);
+    cmn::CsvWriter writer(_csvPath.string(), true);
 }
 
 void HttpMetrics::to_stream(std::ostream& ostr) const
@@ -58,7 +59,7 @@ void HttpMetrics::to_csv(bool isNew)
 {
     std::lock_guard<std::mutex> lock(_mutex);
 
-    cmn::CsvWriter writer(_filePath, isNew);
+    cmn::CsvWriter writer(_csvPath.string(), isNew);
 
     std::vector<std::string> metricsCollection;
     

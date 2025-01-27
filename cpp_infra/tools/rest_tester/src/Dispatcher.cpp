@@ -17,7 +17,7 @@ namespace nvd
 {
 
 // todo - read auth method from input args 
-Dispatcher::Dispatcher(std::string host, std::string port, std::string target, size_t runtimeSeconds, int version, int num_connections, AuthMethod authMethod) :
+Dispatcher::Dispatcher(std::string host, std::string port, std::string target, size_t runtimeSeconds, int version, int num_connections, std::string metrics_out_path, AuthMethod authMethod) :
     _sslContext(authMethod),
     _work_guard(net::make_work_guard(_ioc)),
     _authMethod(authMethod),
@@ -26,7 +26,7 @@ Dispatcher::Dispatcher(std::string host, std::string port, std::string target, s
     _target(std::move(target)),
     _version(version),
     _numConnections(num_connections),
-    _metrics(_target, runtimeSeconds, "/tmp/benchmark/auth/nvd/basic_auth_bm.csv")
+    _metrics(_target, runtimeSeconds, metrics_out_path, "basic_auth_bm.csv")
 {
     _testConfig.push_back({"basic_auth"});
     _testConfig.push_back({"token_auth"});

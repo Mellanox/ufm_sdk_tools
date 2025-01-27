@@ -15,7 +15,7 @@
 namespace nvd
 {
 
-/// @brief Manages the overall benchmarking logic. 
+/// @brief Manages the overall benchmarking logic.
 ///        Owns and reuses ClientSession instances for sending requests in a loop.
 ///        Keeps track of active connections and sends the next request once a response is received
 //         It sends requests in a loop until the runtime expires.
@@ -29,6 +29,7 @@ public:
                size_t runtimeSeconds, 
                int version,
                int num_connections,
+               std::string metrics_out_path,
                AuthMethod authMethod = AuthMethod::BASIC);
     
     /// start runnning test
