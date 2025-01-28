@@ -34,9 +34,12 @@ public:
     /// @brief set request 'user_agent' field
     void setUserAgent(const std::string& userAgent);
 
-    /// @brief set request credentials
+    /// @brief set request basic authorization with credentials
     /// @param credentials string formated as 'user:pass'
     void setAuthorization(const std::string& credentials, bool base64encode = true);
+
+    /// @brief set request basic authorization with token
+    void setTokenAuthorization(const std::string& token, TokenAuthScheme authScheme = TokenAuthScheme::BASIC);
 
     const StringBodyRequestType& get() const {return _req;}
     const StringBodyRequestType& operator*() const {return _req;}

@@ -41,6 +41,8 @@ ClientSession::~ClientSession()
 
 void ClientSession::connect()
 {
+    // todo - add error checks 
+
     // Resolve the host and port
     auto const results = _resolver.resolve(_host, _port);
 
@@ -52,7 +54,7 @@ void ClientSession::connect()
 
     _streamState = StreamState::Connected;
 
-    LOGINFO("ClientSession connect SUccess");
+    LOGINFO("ClientSession connect Succeeded");
 }
 
 void ClientSession::reconnect()
@@ -73,7 +75,7 @@ void ClientSession::recreate_stream()
 
 bool ClientSession::isConnected() const
 {
-    return beast::get_lowest_layer(_stream).socket().is_open() && _streamState == StreamState::Connected;
+    return _streamState == StreamState::Connected && beast::get_lowest_layer(_stream).socket().is_open();
 }
 
 // start the asynchronous operation
@@ -130,34 +132,65 @@ void ClientSession::on_handshake(beast::error_code ec)
     beast::get_lowest_layer(_stream).expires_after(std::chrono::seconds(30));
 }
 
-std::optional<Result> ClientSession::sendRequest(const Request& req)
+std::optional<Response> ClientSession::sendRequest(const Request& req)
 {
-    // Record the start time
-    auto startTime = std::chrono::steady_clock::now();
+    http::response_parser<http::string_body> response_parser;
+    response_parser.body_limit(boost::none); // unlimit body size
 
-    // reset the response
-    auto response = http::response<http::string_body>();
-
-    // todo - check connection
+    if (!isConnected())
+    {
+        reconnect();
+    }
     
     try
     {
-        http::write(_stream, *req);
-        http::read(_stream, _buffer, response);
+        // record the start time
+        auto startTime = std::chrono::steady_clock::now();
+
+        boost::system::error_code ec;
+
+        http::write(_stream, *req, ec);
+
+        if(ec)
+        {
+            LOGERROR("Write failed. ec : {}", ec.what());
+            std::cerr << "Error :" << ": " << ec.what() << "\n";
+            return std::nullopt;
+        }
+
+        // Use the custom parser with no limit for reading
+        http::read(_stream, _buffer, response_parser, ec);
+
+        if(ec) 
+        {
+            LOGERROR("Read response failed. ec : {}", ec.what());
+            std::cerr << "Error :" << ": " << ec.what() << "\n";
+            return std::nullopt;
+        }
+
+        // get ownership of the message 
+        auto response = response_parser.release();
+
+        // Check for Connection: close
+        if (response[http::field::connection] == "close") 
+        {
+            std::cerr << "Server closed the connection. Reconnecting...\n";
+            _streamState = StreamState::Closed;
+        }
+
+        auto latency = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - startTime);
+
+        return Response{responseResultToErrorCode(response), response.body(), latency};
     }
     catch (const std::exception& e)
     {
         std::cerr << "Error :" << ": " << e.what() << "\n";
-        return std::nullopt;
     }
-
-    auto latency = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now() - startTime);
-
-    return Result{static_cast<uint32_t>(response.result()), response.body(), latency};
+    return std::nullopt;
 }
 
-std::future<std::chrono::milliseconds> ClientSession::sendRequestAsync(const Request& req)
+std::future<Response> ClientSession::sendRequestAsync(const Request& req)
 {
     _promise.emplace();
 
@@ -181,6 +214,11 @@ void ClientSession::on_write(beast::error_code ec, std::size_t bytes_transferred
 {
     //std::cout << " on_write : bytes_transferred " << bytes_transferred << std::endl;
 
+    // todo alon - check this
+    http::response_parser<http::string_body> response_parser;
+    response_parser.body_limit(boost::none); // Set unlimit the responser body
+
+    
     boost::ignore_unused(bytes_transferred);
     if (ec) return fail(ec, "write");
     
@@ -241,7 +279,7 @@ void ClientSession::on_read(beast::error_code ec, std::size_t bytes_transferred)
     // Fulfill the promise with the latency
     if (_promise)
     {
-        _promise->set_value(latency);
+        _promise->set_value({responseResultToErrorCode(_response), std::move(_response.body()), latency});
         _promise.reset(); // Reset the promise for the next request
     }
 
@@ -251,6 +289,56 @@ void ClientSession::on_read(beast::error_code ec, std::size_t bytes_transferred)
     // // not_connected happens sometimes so don't bother reporting it.
     // if(ec && ec != beast::errc::not_connected)
     //     return fail(ec, "shutdown");
+}
+
+ErrorCode ClientSession::responseResultToErrorCode(const StringBodyResponseType& response) const
+{
+    auto status = response.result(); // Get the HTTP status code from the response
+
+    // Map HTTP status codes to the ErrorCode enum
+    if (status == http::status::ok || status == http::status::created) 
+    {
+        return ErrorCode::Success; // Success (200 or 201)
+    } 
+    else if (status == http::status::bad_request) 
+    {
+        return ErrorCode::BadRequest; // 400
+    } 
+    else if (status == http::status::unauthorized) 
+    {
+        return ErrorCode::Unauthorized; // 401
+    } 
+    else if (status == http::status::forbidden) 
+    {
+        return ErrorCode::Forbidden; // 403
+    } 
+    else if (status == http::status::not_found) 
+    {
+        return ErrorCode::NotFound; // 404
+    } 
+    else if (status == http::status::request_timeout) 
+    {
+        return ErrorCode::Timeout; // 408
+    } 
+    else if (status == http::status::too_many_requests) 
+    {
+        return ErrorCode::TooManyRequests; // 429
+    } 
+    else if (status == http::status::found) 
+    {
+        return ErrorCode::FoundTempRedirect; // 302
+    } 
+    else if (status >= http::status::bad_request && status < http::status::internal_server_error) 
+    {
+        return ErrorCode::ClientError; // 4xx other than above
+    } 
+    else if (status >= http::status::internal_server_error) 
+    {
+        return ErrorCode::ServerError; // 5xx
+    }
+    
+    LOGINFO("response result UnknownError : {}", static_cast<int>(response.result()));
+    return ErrorCode::UnknownError; // Any other status
 }
 
 void ClientSession::disconnect()
@@ -290,7 +378,7 @@ void ClientSession::closeConnectionAsync()
         beast::bind_front_handler(&ClientSession::on_shutdown, shared_from_this()));
 }
 
-void ClientSession::on_shutdown(beast::error_code ec) 
+void ClientSession::on_shutdown(beast::error_code ec)
 {
     if (ec && ec != boost::asio::error::eof) {
         // Log the shutdown error
@@ -307,10 +395,10 @@ void ClientSession::on_shutdown(beast::error_code ec)
     // Fulfill the promise with an error
     if (_promise) 
     {
+        LOGERROR("on_shutdown. Response Promise was expected to be nullopt.");
         auto latency = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::steady_clock::now() - _startTime);
-
-        _promise->set_value(latency);
+        _promise->set_value({ErrorCode::UnknownError, {}, latency});
         _promise.reset(); // Reset the promise for the next request
     }        
 }

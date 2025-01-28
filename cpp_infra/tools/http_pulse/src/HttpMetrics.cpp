@@ -3,6 +3,8 @@
 
 #include <fmt/core.h>
 
+#include <utils/system/FileSystem.h>
+
 namespace nvd {
 
 HttpMetrics::HttpMetrics(std::string target, size_t tmInSec, const std::string& filePath, const std::string& testName) :
@@ -14,12 +16,18 @@ HttpMetrics::HttpMetrics(std::string target, size_t tmInSec, const std::string& 
     auto fileName = testName + ".csv";
     _csvPath = std::filesystem::path(filePath) / fileName;
 
-    // open new file (wo append mode)
-    cmn::CsvWriter writer(_csvPath.string(), true);
+    // only if csv not exists need to write the header (expected by plot scripts)
+    bool isToWriteHeader = !utils::isFileExists(_csvPath);
+
+    // create with 'append' options
+    cmn::CsvWriter writer(_csvPath.string(), false);
 
     // write the header as expected by the 'run_wrk_benchmark.py' tool (TBD)
-    std::string header = "API,Threads,Connections,Latency (ms),Requests/sec";
-    writer.writeHeader(header);
+    if (isToWriteHeader)
+    {
+        std::string header = "API,Threads,Connections,Latency (ms),Requests/sec";
+        writer.writeHeader(header);
+    }
 }
 
 void HttpMetrics::to_stream(std::ostream& ostr) const

@@ -10,29 +10,11 @@
 #include <http_client/ClientSession.h>
 #include <http_client/SSLContext.h>
 
+#include "Types.h"
 #include "HttpMetrics.h"
 
 namespace nvd
 {
-
-struct HttpCommand
-{
-    std::string host;
-    std::string port;
-    std::string url;
-    int num_connections;
-    size_t runtime_seconds;
-    int version;
-
-    std::string metrics_out_path;
-    std::string name;
-
-    bool dry_run;
-
-    // Optional parameteres
-    std::optional<std::string> user;
-    std::optional<std::string> certPath;
-};
 
 /// @brief Manages the overall benchmarking logic.
 ///        Owns and reuses ClientSession instances for sending requests in a loop.
@@ -42,7 +24,7 @@ class Dispatcher
 {
 public:
 
-    Dispatcher(const HttpCommand& command);
+    Dispatcher(AuthMethod method, const HttpCommand& command);
     
     /// start runnning test
     void start();
@@ -53,8 +35,12 @@ private:
     void runTest(std::string testName);
 
     void sendRequests(ClientSession& session);
+    void sendRequestsAsync(ClientSession& session);
 
     std::unique_ptr<nvd::Request> createRequest() const;
+
+    /// @brief handle response received from http client session
+    void handleResponse(const Response& resp);
 
     nvd::AuthMethod getAuthMethod() const;
 
@@ -73,6 +59,9 @@ private:
     };
 
     std::vector<TestConfig> _testConfig;
+
+    // define maximum message print size
+    static constexpr size_t ConsoleMaxPrintSize = 1024;
 };
 
 } // namespace

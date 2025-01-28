@@ -51,7 +51,6 @@ private:
 
     static std::vector<LogEntry> logBuffer;
     static void flushBuffer();
-
 };
 
 } // namespace nvd

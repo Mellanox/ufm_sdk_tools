@@ -61,10 +61,10 @@ public:
     std::future<void> connectAsync(const std::string& host, const std::string& port);
 
     /// @brief send a sync request
-    std::optional<Result> sendRequest(const Request& req);
+    std::optional<Response> sendRequest(const Request& req);
 
     /// @brief send an async request
-    std::future<std::chrono::milliseconds> sendRequestAsync(const Request& req);
+    std::future<Response> sendRequestAsync(const Request& req);
 
 private:
 
@@ -83,6 +83,8 @@ private:
     void recreate_stream();
 
     void fail(beast::error_code ec, const char* what);
+
+    ErrorCode responseResultToErrorCode(const StringBodyResponseType& response) const;
 
     enum class StreamState
     {
@@ -106,7 +108,7 @@ private:
     AuthMethod _authMethod;
     StreamState _streamState;
 
-    std::optional<std::promise<std::chrono::milliseconds>> _promise; // Holds the promise for the current request
+    std::optional<std::promise<Response>> _promise; // Holds the promise for the current request
     std::optional<std::promise<void>> _connectPromise; // Holds the promise for the current request
 
     StringBodyResponseType _response;

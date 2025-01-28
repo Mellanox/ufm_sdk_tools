@@ -47,5 +47,17 @@ void Request::setAuthorization(const std::string& credentials, bool base64encode
     _req.set(http::field::authorization, "Basic " + base64Credentials);
 }
 
+void Request::setTokenAuthorization(const std::string& token, TokenAuthScheme authScheme)
+{
+    // the server is configured to handle 'Authorization: Basic <token>' (and not 'Authorization: Bearer <token>').
+    if (authScheme == TokenAuthScheme::BASIC) 
+    {
+        _req.set(http::field::authorization, "Basic " + token);
+    }
+    else
+    {
+        _req.set(http::field::authorization, "Bearer " + token);
+    }
+}
 
 } // namespace
