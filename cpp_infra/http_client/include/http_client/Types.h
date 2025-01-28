@@ -1,6 +1,6 @@
 #pragma once
 
-#include <chrono>
+#include <utils/types/Time.h>
 
 namespace nvd {
 
@@ -18,11 +18,6 @@ enum class TokenAuthScheme
     BASIC,
     BEARER
 };
-
-using rep_t = std::chrono::system_clock::rep;
-using period_t = std::nano;
-        
-using duration_t = std::chrono::duration<rep_t, period_t>;
 
 enum class ErrorCode : uint32_t
 {
@@ -44,7 +39,7 @@ struct Response
 {
     ErrorCode statusCode;
     std::string payload;
-    duration_t latency;
+    time::DurationT latency;
 };
 
 

@@ -39,6 +39,9 @@ set(CMAKE_CXX_STANDARD 20)
 include_directories(${Boost_INCLUDE_DIRS})
 link_directories(${Boost_LIBRARY_DIRS})
 
+#message ("include_directories " ${CMAKE_CURRENT_SOURCE_DIR}/utils/types/include/)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/utils/types/include/)
+
 # read the ENABLE_TESTING option to toggle test mode (default is OFF)
 option(ENABLE_TESTING "Enable testing mode with GoogleTest" OFF)
 
