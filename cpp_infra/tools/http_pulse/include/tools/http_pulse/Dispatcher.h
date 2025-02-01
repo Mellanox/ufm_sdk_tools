@@ -40,7 +40,7 @@ private:
     std::unique_ptr<nvd::Request> createRequest() const;
 
     /// @brief handle response received from http client session
-    void handleResponse(const Response& resp);
+    void handleResponse(ClientSession& session, const Response& resp);
 
     nvd::AuthMethod getAuthMethod() const;
 

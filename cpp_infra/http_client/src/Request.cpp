@@ -28,7 +28,7 @@ void Request::create(http::verb method,
         _req.set(http::field::content_type, "application/json"); // Add Content-Type header
     }
 
-    _req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+    _req.set(http::field::user_agent, "Pulse-Tool/1.0");
 }
 
 void Request::setUserAgent(const std::string& userAgent)

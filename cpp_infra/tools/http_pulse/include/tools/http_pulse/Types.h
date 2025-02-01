@@ -10,13 +10,14 @@ struct HttpCommand
     std::string host;
     std::string port;
     std::string target;
-    int num_connections;    
+    int num_connections;
     int version;
 
     std::string metrics_out_path;
     std::string name;
+    std::string connection_mode;
 
-    mutable bool dry_run;
+    mutable bool dryrun;
 
     // Optional parameteres
     std::optional<size_t> runtime_seconds;

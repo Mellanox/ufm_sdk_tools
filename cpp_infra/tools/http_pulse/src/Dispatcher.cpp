@@ -25,8 +25,8 @@ Dispatcher::Dispatcher(AuthMethod method, const HttpCommand& command) :
     // todo - read from config tests (or other class e.g. TestVector)
     _testConfig.push_back({command.name});
 
-    // case 'runtime_seconds' nullopt set dry_run
-    _command.dry_run = !command.runtime_seconds ? true : command.dry_run;
+    // case 'runtime_seconds' nullopt set dryrun
+    _command.dryrun = !command.runtime_seconds ? true : command.dryrun;
 }
 
 void Dispatcher::start()
@@ -65,7 +65,7 @@ void Dispatcher::runTest(std::string testName)
 
     for (int i = 0; i < _command.num_connections; ++i) 
     {
-        auto session = std::make_shared<ClientSession>(_ioc, _sslContext.get(), _command.host, _command.port, authMethod);
+        auto session = std::make_shared<ClientSession>(_ioc, _sslContext.get(), _command.host, _command.port, authMethod, 256066554);
         sessions.push_back(session);        
     }
 
@@ -124,27 +124,19 @@ std::unique_ptr<nvd::Request> Dispatcher::createRequest() const
 // todo - sendRequestsAsync & sendRequests should use sendRequests_i for the common code
 void Dispatcher::sendRequests(ClientSession& session)
 {
-    auto req = createRequest();
-
-    auto endTime = std::chrono::steady_clock::now() + std::chrono::seconds(_metrics.runtimeInSec());
-
-    // Loop to send requests while runtime has not expired
-    while (std::chrono::steady_clock::now() < endTime)
+    try
     {
-        try
+        auto req = createRequest();
+        auto endTime = std::chrono::steady_clock::now() + std::chrono::seconds(_metrics.runtimeInSec());
+        while (std::chrono::steady_clock::now() < endTime)
         {
-            // Serialize the headers and log them
-            // std::ostringstream header_stream;
-            // header_stream << req.get().base(); 
-            // LOGINFO("--- sendRequest {}", header_stream.str());
-
             _metrics.record_request();
-
+            
             auto resp = session.sendRequest(*req);
 
             if (resp)
             {
-                handleResponse(*resp);
+                handleResponse(session, *resp);
             }
             else
             {
@@ -152,15 +144,15 @@ void Dispatcher::sendRequests(ClientSession& session)
                 LOGERROR("sendRequest Failed. Exit the test");
                 break;
             }
-            if (_command.dry_run) break;
+            if (_command.dryrun) break;
         } 
-        catch (const std::exception& e)
-        {
-            std::cerr << "Request error: " << e.what() << "\n";
-            LOGERROR("sendRequest exception Err {}. Exit the test", e.what());
-            break;
-        }
     }
+    catch (const std::exception& e)
+    {
+        std::cerr << "Request error: " << e.what() << "\n";
+        LOGERROR("sendRequest exception Err {}. Exit the test", e.what());
+    }
+    
 }
 
 // todo - sendRequestsAsync & sendRequests should use sendRequests_i for the common code
@@ -184,19 +176,19 @@ void Dispatcher::sendRequestsAsync(ClientSession& session)
             _metrics.record_request();
             auto fuResp = session.sendRequestAsync(*req);
             auto resp = fuResp.get();
-            handleResponse(resp);
+            handleResponse(session, resp);
         } 
         catch (const std::exception& e)
         {
             std::cerr << "Request error: " << e.what() << "\n";
         }
 
-        if (_command.dry_run) break;
+        if (_command.dryrun) break;
     }
 }
 
 
-void Dispatcher::handleResponse(const Response& resp)
+void Dispatcher::handleResponse(ClientSession& session, const Response& resp)
 {
     _metrics.record_response(std::chrono::duration_cast<std::chrono::milliseconds>(resp.latency), resp.statusCode);
 
@@ -207,8 +199,9 @@ void Dispatcher::handleResponse(const Response& resp)
 
     if (resp.statusCode == ErrorCode::Success)
     {
-        if (_command.dry_run)
+        if (_command.dryrun)
         {
+            LOGINFO("Response payload size : {}", resp.payload.size());
             if (resp.payload.size() <= ConsoleMaxPrintSize)
             {
                 std::cout << resp.payload << std::endl;
@@ -229,6 +222,11 @@ void Dispatcher::handleResponse(const Response& resp)
     {
         std::cout << "Responde Received Status Code : " << static_cast<uint32_t>(resp.statusCode) << "\n";
     }
+
+    if (_command.connection_mode == "new")
+    {
+        session.disconnect();
+    }    
 }
 
 } // namespace nvd

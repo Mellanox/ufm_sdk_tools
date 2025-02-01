@@ -26,7 +26,14 @@ using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
 namespace nvd {
 
-/// @brief  Manage a client session on top the boost ASIO and beast library.
+// TODO - 
+// 1. HTTP scheme Support (port 80 or custom port) Need to use raw socket instead ssl stream.
+//    Using Variant or template-based polymorphism
+
+
+/// @brief  Manage a http-client session on top the boost ASIO and beast library.
+///         The session is designed to send SINGLE message a time.
+///         For sending multiple messages in parallell, user should create multiple sessions.
 class ClientSession : public std::enable_shared_from_this<ClientSession>
 {
 public:
@@ -36,13 +43,16 @@ public:
 
     using StringBodyResponseType = beast::http::response<StringBody>;
     using StringBodyRequestParserType = beast::http::response_parser<StringBody>;
+    
+    static constexpr size_t DefaultBufferPreallocateSize = 4*1024*1024;
 
     /// @brief construct ClientSession object given the io_context and ssl context
-    explicit ClientSession(net::io_context& ioc, 
+    explicit ClientSession(net::io_context& ioc,
                            ssl::context& sslCtx,
-                           const std::string& host, 
+                           const std::string& host,
                            const std::string& port,
-                           AuthMethod authMethod = AuthMethod::BASIC);
+                           AuthMethod authMethod = AuthMethod::BASIC,
+                           size_t bufferPreallocateSize = DefaultBufferPreallocateSize);
 
     ~ClientSession();
     
@@ -61,12 +71,22 @@ public:
     std::future<void> connectAsync(const std::string& host, const std::string& port);
 
     /// @brief send a sync request
+    /// @return Response object, encapsulates the payload and return code, nullopt in case of error (no valid response)
     std::optional<Response> sendRequest(const Request& req);
+
+    /// @brief send the request, with additional profiling measurments: 
+    ///        - time wait for read event
+    ///        - time to read the payload
+    /// @return Response object, encapsulates the payload and return code, nullopt in case of error (no valid response)
+    std::optional<Response> sendRequestProfiled(const Request& req);
 
     /// @brief send an async request
     std::future<Response> sendRequestAsync(const Request& req);
 
 private:
+
+    /// @brief read the response async with payload read time measurments
+    std::future<std::optional<Response>> readAsync();
 
     void onResolve(beast::error_code ec, tcp::resolver::results_type results);
     void on_connect(beast::error_code ec, tcp::resolver::results_type::endpoint_type);
@@ -79,6 +99,8 @@ private:
     void on_shutdown(beast::error_code ec);
     void reestablish_connection();
 
+    void closeSSLStream();
+    
     // sync
     void recreate_stream();
 
@@ -110,6 +132,9 @@ private:
 
     std::optional<std::promise<Response>> _promise; // Holds the promise for the current request
     std::optional<std::promise<void>> _connectPromise; // Holds the promise for the current request
+
+    boost::beast::http::response_parser<StringBody> _responseParser;
+    std::promise<std::optional<Response>> _responsePromise;
 
     StringBodyResponseType _response;
 

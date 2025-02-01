@@ -19,11 +19,13 @@ namespace http = boost::beast::http;    // from <boost/beast/http.hpp>
 ClientSession::ClientSession(net::io_context& ioc, 
                              ssl::context& sslCtx,
                              const std::string& host, const std::string& port,
-                             AuthMethod authMethod) :
+                             AuthMethod authMethod,
+                             size_t bufferPreallocateSize) :
     _id{++_nextId},
     _sslCcontext(sslCtx),
     _resolver(net::make_strand(ioc)),
     _stream(net::make_strand(ioc), sslCtx),
+    _buffer(bufferPreallocateSize),
     _host(host),
     _port(port),
     _authMethod(authMethod),
@@ -37,6 +39,11 @@ ClientSession::~ClientSession()
     {
         disconnect();
     }
+}
+
+void ClientSession::disconnect()
+{
+    closeSSLStream();    
 }
 
 void ClientSession::connect()
@@ -54,7 +61,7 @@ void ClientSession::connect()
 
     _streamState = StreamState::Connected;
 
-    LOGINFO("ClientSession connect Succeeded");
+    LOGDEBUG("ClientSession connect Succeeded");
 }
 
 void ClientSession::reconnect()
@@ -172,9 +179,9 @@ std::optional<Response> ClientSession::sendRequest(const Request& req)
         auto response = response_parser.release();
 
         // Check for Connection: close
-        if (response[http::field::connection] == "close") 
+        if (response[http::field::connection] == "close")
         {
-            std::cerr << "Server closed the connection. Reconnecting...\n";
+            LOGINFO("Server Connection is Closed");
             _streamState = StreamState::Closed;
         }
 
@@ -188,6 +195,93 @@ std::optional<Response> ClientSession::sendRequest(const Request& req)
         std::cerr << "Error :" << ": " << e.what() << "\n";
     }
     return std::nullopt;
+}
+
+std::optional<Response> ClientSession::sendRequestProfiled(const Request& req)
+{
+    boost::system::error_code ec;
+
+    if (!isConnected())
+    {
+        reconnect();
+    }
+
+    // ---- Synchronous Write ----
+    http::write(_stream, *req, ec);
+    if (ec)
+    {
+        LOGERROR("Write failed: {}", ec.message());
+        return std::nullopt;
+    }
+
+    auto responseFuture = readAsync();
+
+    // wait for async read to complete
+    return responseFuture.get(); 
+}
+
+std::future<std::optional<Response>> ClientSession::readAsync()
+{
+    _responsePromise = std::promise<std::optional<Response>>();
+    std::future<std::optional<Response>> responseFuture = _responsePromise.get_future();
+
+    _responseParser.body_limit(boost::none); // Set unlimit the responser body
+    _responseParser.eager(true);  // Stop after headers
+
+    // Measure the request start time
+    auto startTime = std::chrono::steady_clock::now();
+
+    // read headers async, to enable measure the time to read the payload
+    http::async_read_header(_stream, _buffer, _responseParser,
+        [startTime, this]
+        (boost::system::error_code ec, std::size_t /*bytes_transferred*/)
+        {
+            if (ec)
+            {
+                LOGERROR("Header read failed: {}", ec.message());
+                _responsePromise.set_value(std::nullopt);
+                return;
+            }
+
+            // Capture time when headers are received
+            auto headersReadyTime = std::chrono::steady_clock::now();
+
+            // Now read the full body
+            http::async_read(_stream, _buffer, _responseParser,
+                [headersReadyTime, startTime, this]
+                (boost::system::error_code ec_, std::size_t /*bytes_transferred*/)
+                {
+                    if (ec_)
+                    {
+                        LOGERROR("Body read failed: {}", ec_.message());
+                        _responsePromise.set_value(std::nullopt);
+                        return;
+                    }
+
+                    auto response = _responseParser.release();
+
+                    // Measure time from request sent to headers received
+                    auto headerLatency = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        headersReadyTime - startTime);
+
+                    // Measure time from headers received to full body read
+                    auto bodyLatency = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::steady_clock::now() - headersReadyTime);
+
+                    LOGINFO("Header latency: {} ms, Body read latency: {} ms", headerLatency.count(), bodyLatency.count());
+
+                    auto latency = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            std::chrono::steady_clock::now() - startTime);
+
+                    // Return response
+                    _responsePromise.set_value(Response{
+                        responseResultToErrorCode(response),
+                        response.body(),
+                        latency});
+                });
+        }
+    );    
+    return responseFuture;
 }
 
 std::future<Response> ClientSession::sendRequestAsync(const Request& req)
@@ -233,14 +327,13 @@ void ClientSession::on_read(beast::error_code ec, std::size_t bytes_transferred)
 {
     boost::ignore_unused(bytes_transferred);
 
-    if (ec == beast::http::error::end_of_stream) 
+    if (ec)
     {
-        _streamState = StreamState::EndOfStream;
-        // Gracefully close the SSL stream todo - consider async_shutdown 
-        _stream.shutdown();
-    }
-    else if (ec)
-    {
+        if (ec == beast::http::error::end_of_stream) 
+        {
+            _streamState = StreamState::EndOfStream;
+            _stream.shutdown();
+        }
         return fail(ec, "read");
     }
 
@@ -289,6 +382,33 @@ void ClientSession::on_read(beast::error_code ec, std::size_t bytes_transferred)
     // // not_connected happens sometimes so don't bother reporting it.
     // if(ec && ec != beast::errc::not_connected)
     //     return fail(ec, "shutdown");
+}
+
+void ClientSession::closeSSLStream()
+{
+    boost::system::error_code ec;
+    
+    // Perform SSL shutdown
+    _stream.shutdown(ec);
+    if (ec == boost::asio::error::eof) 
+    {
+        // This is a normal closure; ignore it
+        ec = {};
+    } 
+    else if (ec) 
+    {
+        std::cerr << "SSL shutdown error: " << ec.message() << "\n";
+    }
+
+    // Close the underlying TCP socket
+    _stream.next_layer().socket().close(ec);
+
+    if (ec) 
+    {
+        std::cerr << "Socket close error: " << ec.message() << "\n";
+    }
+
+    _streamState = StreamState::Closed;
 }
 
 ErrorCode ClientSession::responseResultToErrorCode(const StringBodyResponseType& response) const
@@ -340,21 +460,6 @@ ErrorCode ClientSession::responseResultToErrorCode(const StringBodyResponseType&
     LOGINFO("response result UnknownError : {}", static_cast<int>(response.result()));
     return ErrorCode::UnknownError; // Any other status
 }
-
-void ClientSession::disconnect()
-{
-    beast::error_code ec;
-    
-    // Gracefully close the socket
-    beast::get_lowest_layer(_stream).socket().shutdown(tcp::socket::shutdown_both, ec);
-
-    _streamState = StreamState::Closed;
-
-    // not_connected happens sometimes so don't bother reporting it.
-    if(ec && ec != beast::errc::not_connected)
-        return fail(ec, "shutdown");
-}
-
 
 // Report a failure
 void ClientSession::fail(beast::error_code ec, char const* what)

@@ -14,6 +14,7 @@
 //
 // -- POST Token request (get the token):
 // ./pulse --method POST --host 10.237.169.185 --target /ufmRest/app/tokens --user admin:123456
+// ./pulse --host 10.237.169.185 --target /ufmRest/app/users --name bm_token_auth --token ZfNpj7lU1G1KUmf88KHZXFGLpi8F26 --connection-mode keep-alive --seconds 60
 int main(int argc, char** argv)
 {
     std::string logDir = "/tmp/log";
