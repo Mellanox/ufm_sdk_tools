@@ -50,7 +50,7 @@ def parse_latency(output):
         float or None: The average latency value if found, None otherwise.
     """
     # Regex to match Latency Avg value in ms or s
-    match = re.search(r"Latency\s+(\d+\.\d+)(ms|s)", output)
+    match = re.search(r"Latency\s+(\d+(?:\.\d+)?)(us|ms|s)", output)
     if match:
         avg_latency = float(match.group(1))
         unit = match.group(2)
@@ -94,11 +94,17 @@ def run_wrk(wrk_conf, wrk_v, api, threads, connections, wrk_path):
     headers = []
 
     duration = wrk_conf.get("duration", "3s")  # Default duration is 3 seconds
+    timeout = wrk_conf.get("timeout", "2s")  # Default timeout is 2 seconds
 
     rate = 0
     if wrk_v == "wrk2":
-        default_rate = wrk_conf.get("rate", "10")  # read default test rate
-        rate = int(api.get("rate", default_rate))  # read rate set in api url
+        rate = int(wrk_conf.get("rate", "10"))  # Default rate 10 (wrk2)
+
+    if "timeout" in api:
+        timeout = api["timeout"]
+
+    if "rate" in api:
+        rate = api["rate"]
 
     # Add headers from the configuration
     if "headers" in api:
@@ -122,6 +128,8 @@ def run_wrk(wrk_conf, wrk_v, api, threads, connections, wrk_path):
         f"-c{connections}",
         f"-d{duration}",
         "--latency",
+        "--timeout",
+        f"{timeout}",
         url,        
     ] + headers
 
@@ -176,6 +184,7 @@ def run_benchmark(bm_set, wrk_v, enable_plotting, benchmark_name, threads_connec
             outputs += output + "\n"
 
             try:
+
                 # Parse the output to extract Latency and RPS, then append to the DataFrame
                 # This parsing depends on the specific format of wrk's output
                 latency = float(parse_latency(output))

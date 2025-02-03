@@ -79,7 +79,9 @@ def plot_per_connection_threads(dataframes, output_folder):
 
         # Subplot 1: Latency Comparison
         for test_case, group in subset.groupby("test_case"):
-            avg_latency = group.groupby("url")["latency"].mean()
+            group["url"] = pd.Categorical(group["url"], categories=endpoints, ordered=True)
+            avg_latency = group.groupby("url", observed=False)["latency"].mean().reindex(endpoints)
+
             axes[0].plot(
                 avg_latency.index,
                 avg_latency,
@@ -89,14 +91,17 @@ def plot_per_connection_threads(dataframes, output_folder):
 
         axes[0].set_title(f"Average Latency Comparison (Connections: {combination})", fontsize=16)
         axes[0].set_ylabel("Latency (ms)", fontsize=12)
-        axes[0].set_xticks(range(len(endpoints)))
-        axes[0].set_xticklabels(endpoints, rotation=45, ha="right")
+        axes[0].set_xticks(range(len(avg_latency.index)))
+        axes[0].set_xticklabels(avg_latency.index, rotation=45, ha="right")
+
         axes[0].legend(fontsize=10)
         axes[0].grid(True)
 
         # Subplot 2: Requests Per Second Comparison
         for test_case, group in subset.groupby("test_case"):
-            reqs_per_sec = group.groupby("url")["requests_per_sec"].mean()
+            group["url"] = pd.Categorical(group["url"], categories=endpoints, ordered=True)
+            reqs_per_sec = group.groupby("url", observed=False)["requests_per_sec"].mean().reindex(endpoints)
+
             axes[1].plot(
                 reqs_per_sec.index,
                 reqs_per_sec,
@@ -107,8 +112,9 @@ def plot_per_connection_threads(dataframes, output_folder):
         axes[1].set_title(f"Requests Per Second Comparison (Connections: {combination})", fontsize=16)
         axes[1].set_ylabel("Requests per Second", fontsize=12)
         axes[1].set_xlabel("Endpoints", fontsize=12)
-        axes[1].set_xticks(range(len(endpoints)))
-        axes[1].set_xticklabels(endpoints, rotation=45, ha="right")
+        axes[1].set_xticks(range(len(reqs_per_sec.index)))
+        axes[1].set_xticklabels(reqs_per_sec.index, rotation=45, ha="right")
+
         axes[1].legend(fontsize=10)
         axes[1].grid(True)
 
@@ -117,7 +123,8 @@ def plot_per_connection_threads(dataframes, output_folder):
         plt.tight_layout()
         plt.savefig(output_file)
         plt.close()
-        print(f"Plot saved for connection_threads {combination}: {output_file}")
+
+        print(f"Plot (v1.0) saved for connection_threads {combination}: {output_file}")
 
 if __name__ == "__main__":
     
