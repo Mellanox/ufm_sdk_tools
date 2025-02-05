@@ -1,0 +1,63 @@
+# run_wrk_bm.py
+run_wrk_bm.py is a Python wrapper for the wrk/wrk2 tools, designed to simplify their usage and provide additional functionality.
+
+# Features
+Simplified Wrk/Wrk2 Integration: Wraps the functionality of wrk and wrk2 for easy execution and configuration.
+Test Configuration Management: Parses and manages test settings from a configuration file.
+Result Visualization: Supports plotting test results for better insights and analysis.
+Configuration Example
+For an example configuration file, refer to:
+UFM/gvvm/authentication_server/benchmark
+
+# run with -h for args list
+python run_wrk_bm.py -h
+
+# Prerequisites:
+pandas, matplotlib (pip install)
+wrk, wrk2 (@see Wrk/Wrk2 Installation guide at the end of this document)
+
+# Wrk/wrk2 Overview
+-------------------
+wrk and wrk2 are high-performance HTTP benchmarking tools designed to test the throughput and latency of web servers or APIs.
+
+# wrk
+A modern HTTP benchmarking tool that generates significant load.
+Features:
+Uses multiple threads and connections for concurrency.
+Provides latency distribution statistics.
+Flexible scripting support in Lua to customize requests.
+Typically used for load testing APIs, web servers, or any HTTP endpoint.
+In wrk, there is no explicit control over the request rate.
+
+# wrk2
+An enhanced version of wrk with a focus on constant request rate testing.
+Differences from wrk:
+Adds rate-limiting (-R flag) to send requests at a constant rate (e.g., 1000 requests/second).
+Ideal for latency benchmarking under steady-state conditions.
+Also supports Lua scripting and provides latency distribution output.
+
+It is built to send requests at a constant rate to simulate real-world scenarios where systems operate at a steady load
+rather than trying to overwhelm them.
+
+Using wrk or wrk2 depends on what you're trying to achieve:
+Use Case Examples:
+wrk: For generating high, unrestricted load to test a server's maximum capacity.
+wrk2: For precisely controlled testing to measure latency at a fixed request rate.
+
+Use wrk for Load Testing:
+If your goal is to find the system's limits: 
+to push the system and identify maximum throughput and bottlenecks.
+
+Use wrk2 for Constant Throughput Testing
+If your goal is to evaluate system behavior under real-world usage scenarios:
+to control the request rate and measure latency and stability under defined conditions.
+
+# Wrk/Wrk2 Installation:
+
+git clone https://github.com/wg/wrk.git
+cd wrk
+make
+
+git clone https://github.com/giltene/wrk2.git
+cd wrk2
+make
