@@ -60,7 +60,7 @@ def merge_ini_files(old_file_path, new_file_path, merged_file_path):
 
     res = config_old.read(old_file_path)
     if not res:
-        logger.error("Error: %s exists but could not be read properly.", old_file_path)
+        logger.error(f"Error: Failed to read file {old_file_path}")
         return False
 
     try:
@@ -82,12 +82,12 @@ def merge_ini_files(old_file_path, new_file_path, merged_file_path):
                     if config_old.has_section(section) and config_old.has_option(section, key):
                         new_value = (config_old.get(section, key)).strip()
                     # Write back the line with preserved comments
-                    of.write("%s = %s\n" % (key, new_value))
+                    of.write(f"{key} = {new_value}\n")
                 else:
                     of.write(line)  # Preserve non-key lines (empty lines, comments)
    
     except Exception as e:
-        logger.error("An unexpected error occurred: %s" % e)
+        logger.error(f"Failed to process a line or to write to merge file: {e}")
         return False
 
     return True
@@ -115,12 +115,9 @@ if __name__ == "__main__":
 
         try:
             logger.info("Configuration file upgraded successfully.")
-            logger.info("Move upgraded file %s to initial location %s" % (tmp_merged_file, new_file))
-            shutil.move(new_file, "%s.backup" % old_file)
+            logger.info(f"Move upgraded file {tmp_merged_file} to initial location {new_file}")
+            shutil.move(new_file, f"{old_file}.backup")
             shutil.move(tmp_merged_file, new_file)
 
         except Exception as e:
-            logger.error("An unexpected error occurred: %s" % e)
-        
-        
-
+            logger.error(f"Failed to move upgraded file: {e}")
