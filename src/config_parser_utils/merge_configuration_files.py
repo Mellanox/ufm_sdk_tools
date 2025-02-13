@@ -1,6 +1,10 @@
 """
+This script merges two INI configuration files, preserving existing values from an old file 
+while integrating updates from a new file. It ensures that missing or modified settings 
+are properly retained and logs any errors encountered during the process.
+
 @copyright:
-    Copyright (C) Mellanox Technologies Ltd. 2014-2024.  ALL RIGHTS RESERVED.
+    Copyright (C) Mellanox Technologies Ltd. 2014-2025.  ALL RIGHTS RESERVED.
 
     This software product is a proprietary product of Mellanox Technologies
     Ltd. (the "Company") and all right, title, and interest in and to the
@@ -15,59 +19,108 @@
 """
 import configparser
 import logging
+from logging.handlers import SysLogHandler
+import shutil
 import sys
 import os
+import re
 
-def merge_ini_files(old_file_path, new_file_path):
+CFG_LINE_RGX = r"^(\S+)\s*=\s*(.*)$"
+
+def setup_logger():
+    """Configures and returns a logger that sends logs to syslog."""
+    logger = logging.getLogger('upgrade')
+    logger.setLevel(logging.DEBUG)
+
+    # Create a syslog handler for the local syslog daemon
+    syslog_handler = SysLogHandler(address=('localhost', 514))
+
+    # Create a log format
+    formatter = logging.Formatter(
+        fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%b %d %H:%M:%S"
+    )
+    syslog_handler.setFormatter(formatter)
+
+    # Add the handler to the logger
+    logger.addHandler(syslog_handler)
+
+    return logger
+
+def merge_ini_files(old_file_path, new_file_path, merged_file_path):
     # Check if files exist
-    if not os.path.isfile(old_file_path):
-        logging.error("file %s does not exist.", old_file_path)
-        sys.exit(1)
-    if not os.path.isfile(new_file_path):
-        logging.error("file %s does not exist.", new_file_path)
-        sys.exit(1)
+    for file_path in (old_file_path, new_file_path):
+        if not os.path.isfile(file_path):
+            logger.error("file %s does not exist.", file_path)
+            return False
 
     # Create a configparser object
     config_old = configparser.ConfigParser()
-    config_new = configparser.ConfigParser()
-    config_merged = configparser.ConfigParser()
+    config_old.optionxform = str  # Preserve case sensitivity
 
-    # Read the old and new files
+    res = config_old.read(old_file_path)
+    if not res:
+        logger.error("Error: %s exists but could not be read properly.", old_file_path)
+        return False
+
     try:
-        config_old.read(old_file_path)
-        config_new.read(new_file_path)
+        with open(new_file_path, 'r', encoding='utf-8') as nf, open(merged_file_path, 'w', encoding='utf-8') as of:
+            section = None
+            for line in nf:
+                stripped = line.strip()
 
-    except configparser.Error as e:
-        logging.error("Failed to parse configurations files: %s", e)
-        sys.exit(1)
+                # Preserve section headers
+                if stripped.startswith("[") and stripped.endswith("]"):
+                    section = stripped[1:-1]
+                    of.write(line)
+                    continue
 
-    # Start with the new configuration as the base for the merged configuration
-    for section in config_new.sections():
-        config_merged.add_section(section)
-        for option in config_new.options(section):
-            config_merged.set(section, option, config_new.get(section, option))
+                # Match key-value pairs, preserving inline comments
+                match = re.match(CFG_LINE_RGX, line)
+                if match and section:
+                    key, new_value = match.groups()
+                    if config_old.has_section(section) and config_old.has_option(section, key):
+                        new_value = (config_old.get(section, key)).strip()
+                    # Write back the line with preserved comments
+                    of.write("%s = %s\n" % (key, new_value))
+                else:
+                    of.write(line)  # Preserve non-key lines (empty lines, comments)
+   
+    except Exception as e:
+        logger.error("An unexpected error occurred: %s" % e)
+        return False
 
-    # Override values in the merged configuration with those from the old configuration
-    for section in config_merged.sections():
-        if config_old.has_section(section):
-            for option in config_merged.options(section):
-                if config_old.has_option(section, option):
-                    # Override the value in the merged configuration
-                    config_merged.set(section, option, config_old.get(section, option))
-
-    # Write the merged configuration to the old file path
-    with open(old_file_path, 'w', encoding="utf-8") as configfile:
-        config_merged.write(configfile)
-
-    logging.info("Configuration has been merged and saved to %s", old_file_path)
+    return True
 
 if __name__ == "__main__":
+    logger = setup_logger()
+
     # Get file paths from command line arguments
     if len(sys.argv) != 3:
-        logging.error("Usage: python merge_configuration_files.py <old_file_path> <new_file_path>")
+        logger.error("Usage: python merge_configuration_files.py <old_file_path> <new_file_path>")
         sys.exit(1)
 
     old_file = sys.argv[1]
     new_file = sys.argv[2]
 
-    merge_ini_files(old_file, new_file)
+    tmp_merged_file = "temp_merged.cfg"
+
+    result = merge_ini_files(old_file, new_file, tmp_merged_file)
+
+    if not result:
+        logger.error("Configuration file upgrade failed.")
+        exit(1)
+
+    else:
+
+        try:
+            logger.info("Configuration file upgraded successfully.")
+            logger.info("Move upgraded file %s to initial location %s" % (tmp_merged_file, new_file))
+            shutil.move(new_file, "%s.backup" % old_file)
+            shutil.move(tmp_merged_file, new_file)
+
+        except Exception as e:
+            logger.error("An unexpected error occurred: %s" % e)
+        
+        
+
