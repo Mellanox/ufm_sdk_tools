@@ -1,8 +1,4 @@
 """
-This script merges two INI configuration files, preserving existing values from an old file 
-while integrating updates from a new file. It ensures that missing or modified settings 
-are properly retained and logs any errors encountered during the process.
-
 @copyright:
     Copyright (C) Mellanox Technologies Ltd. 2014-2025.  ALL RIGHTS RESERVED.
 
@@ -16,6 +12,10 @@ are properly retained and logs any errors encountered during the process.
 
 @author: Miryam Schwartz
 @date:   Nov 14, 2024
+
+This script merges two INI configuration files, preserving existing values from an old file 
+while integrating updates from a new file. It ensures that missing or modified settings 
+are properly retained and logs any errors encountered during the process.
 """
 import configparser
 import logging
@@ -25,12 +25,18 @@ import sys
 import os
 import re
 
+# Matches a config line "key = value".
+# Captures the "key" (non-whitespace) and the "value" (any characters).
 CFG_LINE_RGX = r"^(\S+)\s*=\s*(.*)$"
 
-def setup_logger():
+def setup_logger(plugin_name=None, log_level=None):
     """Configures and returns a logger that sends logs to syslog."""
-    logger = logging.getLogger('upgrade')
-    logger.setLevel(logging.DEBUG)
+    logger_name = f'ufm-plugin-{plugin_name}-configurations-merger' if plugin_name else 'ufm-plugin-configurations-merger'
+    logger = logging.getLogger(logger_name)
+    if log_level:
+        logger.setLevel(getattr(logging, log_level, logging.INFO))
+    else:
+        logger.setLevel(logging.INFO)
 
     # Create a syslog handler for the local syslog daemon
     syslog_handler = SysLogHandler(address=('localhost', 514))
@@ -60,19 +66,19 @@ def merge_ini_files(old_file_path, new_file_path, merged_file_path):
 
     res = config_old.read(old_file_path)
     if not res:
-        logger.error(f"Error: Failed to read file {old_file_path}")
+        logger.error("Error: Failed to read file %s" % old_file_path)
         return False
 
     try:
-        with open(new_file_path, 'r', encoding='utf-8') as nf, open(merged_file_path, 'w', encoding='utf-8') as of:
+        with open(new_file_path, 'r', encoding='utf-8') as new_file, open(merged_file_path, 'w', encoding='utf-8') as old_file:
             section = None
-            for line in nf:
+            for line in new_file:
                 stripped = line.strip()
 
                 # Preserve section headers
                 if stripped.startswith("[") and stripped.endswith("]"):
                     section = stripped[1:-1]
-                    of.write(line)
+                    old_file.write(line)
                     continue
 
                 # Match key-value pairs, preserving inline comments
@@ -82,26 +88,35 @@ def merge_ini_files(old_file_path, new_file_path, merged_file_path):
                     if config_old.has_section(section) and config_old.has_option(section, key):
                         new_value = (config_old.get(section, key)).strip()
                     # Write back the line with preserved comments
-                    of.write(f"{key} = {new_value}\n")
+                    old_file.write(f"{key} = {new_value.strip()}\n")
                 else:
-                    of.write(line)  # Preserve non-key lines (empty lines, comments)
+                    old_file.write(line)  # Preserve non-key lines (empty lines, comments)
    
     except Exception as e:
-        logger.error(f"Failed to process a line or to write to merge file: {e}")
+        logger.exception("Failed to process a line or to write to merge file: %s")
         return False
 
     return True
 
 if __name__ == "__main__":
-    logger = setup_logger()
-
     # Get file paths from command line arguments
-    if len(sys.argv) != 3:
-        logger.error("Usage: python merge_configuration_files.py <old_file_path> <new_file_path>")
+    if len(sys.argv) < 3 or len(sys.argv) > 5:
+        print("Usage: python merge_configuration_files.py <old_file_path> <new_file_path> [plugin_name] [log_level]")
         sys.exit(1)
 
     old_file = sys.argv[1]
     new_file = sys.argv[2]
+
+    # Check for optional arguments
+    plugin_name = None
+    if len(sys.argv) >= 4:
+        plugin_name = sys.argv[3]
+
+    log_level = None
+    if len(sys.argv) == 5:
+        log_level = sys.argv[4].upper()
+
+    logger = setup_logger(plugin_name, log_level)
 
     tmp_merged_file = "temp_merged.cfg"
 
@@ -112,12 +127,11 @@ if __name__ == "__main__":
         exit(1)
 
     else:
-
         try:
+            logger.info("Move upgraded file %s to initial location %s" % (tmp_merged_file, old_file))
+            shutil.move(old_file, f"{old_file}.backup")
+            shutil.move(tmp_merged_file, old_file)
             logger.info("Configuration file upgraded successfully.")
-            logger.info(f"Move upgraded file {tmp_merged_file} to initial location {new_file}")
-            shutil.move(new_file, f"{old_file}.backup")
-            shutil.move(tmp_merged_file, new_file)
 
         except Exception as e:
-            logger.error(f"Failed to move upgraded file: {e}")
+            logger.exception("Failed to move upgraded file from %s to %s." % (tmp_merged_file, old_file))
