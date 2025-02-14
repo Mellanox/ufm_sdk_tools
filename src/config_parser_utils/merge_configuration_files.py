@@ -92,7 +92,7 @@ def merge_ini_files(old_file_path, new_file_path, merged_file_path):
                 else:
                     old_file.write(line)  # Preserve non-key lines (empty lines, comments)
    
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to process a line or to write to merge file: %s")
         return False
 
@@ -133,5 +133,5 @@ if __name__ == "__main__":
             shutil.move(tmp_merged_file, old_file)
             logger.info("Configuration file upgraded successfully.")
 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to move upgraded file from %s to %s." % (tmp_merged_file, old_file))
