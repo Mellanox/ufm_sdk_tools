@@ -31,7 +31,7 @@ CFG_LINE_RGX = r"^(\S+)\s*=\s*(.*)$"
 
 def setup_logger(plugin_name=None, log_level=None):
     """Configures and returns a logger that sends logs to syslog."""
-    logging.basicConfig(format="%[%(levelname)s] %(name)s: %(message)s")
+    logging.basicConfig(format="[%(levelname)s] %(name)s: %(message)s")
     logger_name = f'ufm-plugin-{plugin_name}-configurations-merger' if plugin_name else 'ufm-plugin-configurations-merger'
     logger = logging.getLogger(logger_name)
     if log_level:
