@@ -37,19 +37,29 @@ def setup_logger(plugin_name=None, log_level=None):
         logger.setLevel(getattr(logging, log_level, logging.INFO))
     else:
         logger.setLevel(logging.INFO)
-
-    # Create a syslog handler for the local syslog daemon
-    syslog_handler = SysLogHandler(address=('localhost', 514))
-
-    # Create a log format
     formatter = logging.Formatter(
-        fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        datefmt="%b %d %H:%M:%S"
-    )
-    syslog_handler.setFormatter(formatter)
+            fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+            datefmt="%b %d %H:%M:%S"
+        )
 
-    # Add the handler to the logger
-    logger.addHandler(syslog_handler)
+    syslog_handler = None
+
+    try:
+        # First attempt /dev/log (default for most Unix-like systems)
+        syslog_handler = SysLogHandler(address="/dev/log")
+    except Exception:
+        try:
+            # Fallback for Red Hat or others that use /var/run/syslog
+            syslog_handler = SysLogHandler(address="/var/run/syslog")
+        except Exception:
+            handler = logging.StreamHandler()
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
+            logger.warning("Syslog is not available on this system. Logging to console instead.")
+
+    if syslog_handler:
+        syslog_handler.setFormatter(formatter)
+        logger.addHandler(syslog_handler)        
 
     return logger
 
@@ -129,9 +139,22 @@ if __name__ == "__main__":
     else:
         try:
             logger.info("Move upgraded file %s to initial location %s" % (tmp_merged_file, old_file))
-            shutil.move(old_file, f"{old_file}.backup")
-            shutil.move(tmp_merged_file, old_file)
-            logger.info("Configuration file upgraded successfully.")
+            
+            # Move old file to backup
+            backup_path = f"{old_file}.backup"
+            shutil.move(old_file, backup_path)
+            
+            try:
+                # Move new file to old file location
+                shutil.move(tmp_merged_file, old_file)
+                logger.info("Configuration file upgraded successfully.")
+            except Exception:
+                logger.exception("Failed to move upgraded file from %s to %s. Reverting changes." % (tmp_merged_file, old_file))
+                
+                # Attempt to restore the original file from backup
+                shutil.move(backup_path, old_file)
+                logger.info("Reverted to original configuration file.")
 
         except Exception:
-            logger.exception("Failed to move upgraded file from %s to %s." % (tmp_merged_file, old_file))
+            logger.exception("Failed to move old configuration file to backup, from %s to %s." % (old_file, backup_path))
+
