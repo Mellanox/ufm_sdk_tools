@@ -31,8 +31,7 @@ CFG_LINE_RGX = r"^(\S+)\s*=\s*(.*)$"
 
 def setup_logger(plugin_name=None, log_level=None):
     """Configures and returns a logger that sends logs to syslog."""
-    logging.basicConfig(
-    format="%[%(levelname)s] %(name)s: %(message)s")
+    logging.basicConfig(format="%[%(levelname)s] %(name)s: %(message)s")
     logger_name = f'ufm-plugin-{plugin_name}-configurations-merger' if plugin_name else 'ufm-plugin-configurations-merger'
     logger = logging.getLogger(logger_name)
     if log_level:
@@ -111,7 +110,7 @@ if __name__ == "__main__":
     result = merge_ini_files(old_file, new_file, tmp_merged_file)
 
     if not result:
-        logger.error("Configuration file upgrade failed.")
+        logger.error("Configuration file %s upgrade failed." % old_file)
         exit(1)
 
     else:
@@ -125,13 +124,13 @@ if __name__ == "__main__":
             try:
                 # Move new file to old file location
                 shutil.move(tmp_merged_file, old_file)
-                logger.info("Configuration file upgraded successfully.")
+                logger.info("Configuration file %s upgraded successfully." % old_file)
             except Exception:
                 logger.exception("Failed to move upgraded file from %s to %s. Reverting changes." % (tmp_merged_file, old_file))
                 
                 # Attempt to restore the original file from backup
                 shutil.move(backup_path, old_file)
-                logger.info("Reverted to original configuration file.")
+                logger.info("Reverted to original configuration file %s." % old_file)
 
         except Exception:
             logger.exception("Failed to move old configuration file to backup, from %s to %s." % (old_file, backup_path))
