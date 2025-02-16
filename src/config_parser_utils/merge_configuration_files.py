@@ -31,36 +31,16 @@ CFG_LINE_RGX = r"^(\S+)\s*=\s*(.*)$"
 
 def setup_logger(plugin_name=None, log_level=None):
     """Configures and returns a logger that sends logs to syslog."""
+    logging.basicConfig(
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%b %d %H:%M:%S"
+    )
     logger_name = f'ufm-plugin-{plugin_name}-configurations-merger' if plugin_name else 'ufm-plugin-configurations-merger'
     logger = logging.getLogger(logger_name)
     if log_level:
         logger.setLevel(getattr(logging, log_level, logging.INFO))
     else:
         logger.setLevel(logging.INFO)
-    formatter = logging.Formatter(
-            fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-            datefmt="%b %d %H:%M:%S"
-        )
-
-    syslog_handler = None
-
-    try:
-        # First attempt /dev/log (default for most Unix-like systems)
-        syslog_handler = SysLogHandler(address="/dev/log")
-    except Exception:
-        try:
-            # Fallback for Red Hat or others that use /var/run/syslog
-            syslog_handler = SysLogHandler(address="/var/run/syslog")
-        except Exception:
-            handler = logging.StreamHandler()
-            handler.setFormatter(formatter)
-            logger.addHandler(handler)
-            logger.warning("Syslog is not available on this system. Logging to console instead.")
-
-    if syslog_handler:
-        syslog_handler.setFormatter(formatter)
-        logger.addHandler(syslog_handler)        
-
     return logger
 
 def merge_ini_files(old_file_path, new_file_path, merged_file_path):
