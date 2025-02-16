@@ -72,7 +72,7 @@ def merge_ini_files(old_file_path, new_file_path, merged_file_path):
 
     res = config_old.read(old_file_path)
     if not res:
-        logger.error("Error: Failed to read file %s" % old_file_path)
+        logger.error("Error: Failed to read file %s", old_file_path)
         return False
 
     try:
@@ -99,7 +99,7 @@ def merge_ini_files(old_file_path, new_file_path, merged_file_path):
                     old_file.write(line)  # Preserve non-key lines (empty lines, comments)
    
     except Exception:
-        logger.exception("Failed to process a line or to write to merge file: %s" % old_file)
+        logger.exception("Failed to process a line or to write to merge file: %s", old_file)
         return False
 
     return True
@@ -129,12 +129,12 @@ if __name__ == "__main__":
     result = merge_ini_files(old_file, new_file, tmp_merged_file)
 
     if not result:
-        logger.error("Configuration file %s upgrade failed." % old_file)
+        logger.error("Configuration file %s upgrade failed.", old_file)
         exit(1)
 
     else:
         try:
-            logger.info("Move upgraded file %s to initial location %s" % (tmp_merged_file, old_file))
+            logger.info("Move upgraded file %s to initial location %s", tmp_merged_file, old_file)
             
             # Move old file to backup
             backup_path = f"{old_file}.backup"
@@ -143,17 +143,17 @@ if __name__ == "__main__":
             try:
                 # Move new file to old file location
                 shutil.move(tmp_merged_file, old_file)
-                logger.info("Configuration file %s upgraded successfully." % old_file)
+                logger.info("Configuration file %s upgraded successfully.", old_file)
             except Exception:
-                logger.exception("Failed to move upgraded file from %s to %s. Reverting changes." % (tmp_merged_file, old_file))
+                logger.exception("Failed to move upgraded file from %s to %s. Reverting changes.", tmp_merged_file, old_file)
                 exit(1)
                 
                 # Attempt to restore the original file from backup
                 shutil.move(backup_path, old_file)
-                logger.info("Reverted to original configuration file %s." % old_file)
+                logger.info("Reverted to original configuration file %s.", old_file)
                 exit(1)
 
         except Exception:
-            logger.exception("Failed to move old configuration file to backup, from %s to %s." % (old_file, backup_path))
+            logger.exception("Failed to move old configuration file to backup, from %s to %s.", old_file, backup_path)
             exit(1)
             
