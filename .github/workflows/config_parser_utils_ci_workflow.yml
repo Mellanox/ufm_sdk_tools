@@ -5,6 +5,7 @@ on:
     paths:
       - 'src/config_parser_utils/**'
       - '.github/config_parser_utils_ci_workflow.yml'
+      - 'tests/config_parser_utils_tests/test_merge_configuration_files.py'
 
 jobs:
   pytest:
