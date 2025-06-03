@@ -29,8 +29,12 @@ import re
 # Captures the "key" (non-whitespace) and the "value" (any characters).
 CFG_LINE_RGX = r"^(\S+)\s*=\s*(.*)$"
 
+# Logger name constants
+INITIAL_LOGGER_NAME = "ufm_plugin_conf_merger_initial"
+DEFAULT_LOGGER_NAME = "ufm-plugin-configurations-merger"
+
 # Initialize a module-level logger. Its name helps identify if it's been configured.
-logger = logging.getLogger("ufm_plugin_conf_merger_initial")
+logger = logging.getLogger(INITIAL_LOGGER_NAME)
 logger.setLevel(logging.INFO)
 
 def setup_logger(plugin_name=None, log_level_input=None):
@@ -40,7 +44,7 @@ def setup_logger(plugin_name=None, log_level_input=None):
     log_format = "[%(levelname)s] %(name)s: %(message)s"
     logging.basicConfig(format=log_format, level=logging.INFO) 
 
-    final_logger_name = 'ufm-plugin-configurations-merger'
+    final_logger_name = DEFAULT_LOGGER_NAME
     if plugin_name:
         final_logger_name = f'ufm-plugin-{plugin_name}-configurations-merger'
 
@@ -78,7 +82,7 @@ def merge_ini_files(old_file_path, new_file_path, merged_file_path):
     # If this function is called and the logger is still the initial placeholder,
     # it means __main__ block didn't run (e.g. imported as a module).
     # So, initialize the logger with default settings.
-    if logger.name == "ufm_plugin_conf_merger_initial":
+    if logger.name == INITIAL_LOGGER_NAME:
         setup_logger() # Initialize with default name and level
 
     # Check if files exist
