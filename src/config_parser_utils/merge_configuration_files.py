@@ -29,15 +29,34 @@ import re
 # Captures the "key" (non-whitespace) and the "value" (any characters).
 CFG_LINE_RGX = r"^(\S+)\s*=\s*(.*)$"
 
-def setup_logger(plugin_name=None, log_level=None):
-    """Configures and returns a logger that sends logs to syslog."""
-    logging.basicConfig(format="[%(levelname)s] %(name)s: %(message)s")
-    logger_name = f'ufm-plugin-{plugin_name}-configurations-merger' if plugin_name else 'ufm-plugin-configurations-merger'
-    logger = logging.getLogger(logger_name)
-    if log_level:
-        logger.setLevel(getattr(logging, log_level, logging.INFO))
-    else:
-        logger.setLevel(logging.INFO)
+# Logger name constants
+INITIAL_LOGGER_NAME = "ufm_plugin_conf_merger_initial"
+DEFAULT_LOGGER_NAME = "ufm-plugin-configurations-merger"
+
+# Initialize a module-level logger. Its name helps identify if it's been configured.
+logger = logging.getLogger(INITIAL_LOGGER_NAME)
+logger.setLevel(logging.INFO)
+
+def setup_logger(plugin_name=None, log_level_input=None):
+    """Configures the module-level logger."""
+    global logger
+
+    log_format = "[%(levelname)s] %(name)s: %(message)s"
+    logging.basicConfig(format=log_format, level=logging.INFO) 
+
+    final_logger_name = DEFAULT_LOGGER_NAME
+    if plugin_name:
+        final_logger_name = f'ufm-plugin-{plugin_name}-configurations-merger'
+
+    _configured_logger = logging.getLogger(final_logger_name)
+
+    actual_log_level = logging.INFO 
+    if log_level_input:
+        level_name_str = str(log_level_input).upper()
+        actual_log_level = getattr(logging, level_name_str, logging.INFO)
+    _configured_logger.setLevel(actual_log_level)
+
+    logger = _configured_logger
     return logger
 
 def merge_ini_files(old_file_path, new_file_path, merged_file_path):
@@ -59,7 +78,13 @@ def merge_ini_files(old_file_path, new_file_path, merged_file_path):
     Returns:
         bool: True if merging is successful, False if any file is missing or an error occurs.
     """
-    
+
+    # If this function is called and the logger is still the initial placeholder,
+    # it means __main__ block didn't run (e.g. imported as a module).
+    # So, initialize the logger with default settings.
+    if logger.name == INITIAL_LOGGER_NAME:
+        setup_logger() # Initialize with default name and level
+
     # Check if files exist
     for file_path in (old_file_path, new_file_path):
         if not os.path.isfile(file_path):
@@ -107,22 +132,24 @@ def merge_ini_files(old_file_path, new_file_path, merged_file_path):
 if __name__ == "__main__":
     # Get file paths from command line arguments
     if len(sys.argv) < 3 or len(sys.argv) > 5:
-        print("Usage: python merge_configuration_files.py <old_file_path> <new_file_path> [plugin_name] [log_level]")
+        # Since setup_logger is called right after, print is fine for this usage message.
+        print("Usage: python merge_configuration_files.py <old_file_path> "
+              "<new_file_path> [plugin_name] [log_level]")
         sys.exit(1)
 
     old_file = sys.argv[1]
     new_file = sys.argv[2]
 
-    # Check for optional arguments
-    plugin_name = None
+    cli_plugin_name = None
     if len(sys.argv) >= 4:
-        plugin_name = sys.argv[3]
+        cli_plugin_name = sys.argv[3]
 
-    log_level = None
+    cli_log_level = None
     if len(sys.argv) == 5:
-        log_level = sys.argv[4].upper()
+        cli_log_level = sys.argv[4] 
 
-    logger = setup_logger(plugin_name, log_level)
+    # Configure the global logger instance using command-line arguments.
+    setup_logger(plugin_name=cli_plugin_name, log_level_input=cli_log_level)
 
     tmp_merged_file = "temp_merged.cfg"
 
