@@ -38,4 +38,4 @@ __all__ = [
     "DEFAULT_CHECK_FUNCTIONS",
     "DEFAULT_ACTION_FUNCTIONS",
     "C" # Export constants as 'C' for plugin use
-] 
+]
