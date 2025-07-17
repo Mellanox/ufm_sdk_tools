@@ -73,11 +73,10 @@ def restart_supervisor_program_action(config: Dict[str, Any], logger: logging.Lo
                     program_name, status_result.stdout.strip()
                 )
 
-        except subprocess.CalledProcessError as ex:
-            logger.error(
-                "Failed to restart supervisord program '%s' (attempt %s/%s). RC: %s\nStdout: %s\nStderr: %s",
-                program_name, attempt + 1, max_retries, ex.returncode, 
-                ex.stdout.strip(), ex.stderr.strip()
+        except subprocess.CalledProcessError:
+            logger.exception(
+                "Failed to restart supervisord program '%s' (attempt %s/%s)",
+                program_name, attempt + 1, max_retries
             )
         except FileNotFoundError:
             logger.error(
