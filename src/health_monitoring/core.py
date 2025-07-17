@@ -43,8 +43,8 @@ class HealthMonitor:
     def __init__(
         self,
         monitored_tasks: List[Dict[str, Any]],
-        check_functions: Dict[str, Callable[[Dict[str, Any], TaskLoggerAdapter], bool]],
-        action_functions: Dict[str, Callable[[Dict[str, Any], TaskLoggerAdapter], None]],
+        check_functions: Dict[str, Callable[[Dict[str, Any], logging.LoggerAdapter], bool]],
+        action_functions: Dict[str, Callable[[Dict[str, Any], logging.LoggerAdapter], None]],
         base_logger_name: str = C.DEFAULT_LOGGER_NAME,
         loop_sleep_interval: float = C.DEFAULT_LOOP_SLEEP_INTERVAL
     ):
